@@ -33,6 +33,8 @@ canvas#gl{position:fixed;inset:0;width:100%;height:100%;display:block;touch-acti
 .lb{position:absolute;left:0;top:0;font:500 11px/1 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--fg);opacity:.8;white-space:nowrap;padding:8px 6px;pointer-events:auto;cursor:pointer;background:none;border:0;text-shadow:0 0 6px #000,0 0 2px #000;will-change:transform}
 .lb.moon{font-size:10px;color:var(--dim)}
 .lb.far{font-size:10px;letter-spacing:.1em;opacity:.62}
+#ref{position:absolute;left:0;top:0;box-sizing:border-box;border:1.5px solid var(--fg);border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.65),inset 0 0 0 1px rgba(0,0,0,.65);pointer-events:none;transition:opacity .5s}
+#ref span{position:absolute;left:50%;top:100%;transform:translateX(-50%);margin-top:6px;white-space:nowrap;font:500 10px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--fg);text-shadow:0 0 6px #000,0 0 2px #000}
 #tabs{display:flex;gap:14px;overflow-x:auto;scrollbar-width:none;padding:2px 2px 0}
 #tabs::-webkit-scrollbar{display:none}
 .tab{flex:none;font:500 10px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim);background:none;border:0;border-bottom:1px solid transparent;padding:8px 0 6px;cursor:pointer;text-shadow:0 0 6px #000}
@@ -98,7 +100,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--sun);outline-of
 <body>
 
 <canvas id="gl" tabindex="0" aria-label="Vue 3D du système solaire"></canvas>
-<div id="labels"></div>
+<div id="labels"><div id="ref" hidden><span></span></div></div>
 
 <div class="ui" id="top">
   <div id="ident">
@@ -296,6 +298,26 @@ B.push({id:'hde226868',n:'HDE 226868',t:'Supergéante bleue O9.7 · compagne de 
 ['sgr1806','SGR 1806-20','Magnétar · étoile à neutrons',[272.164,-20.411,28000],7.55,7.55,'10¹¹ teslas',14000,"Le champ magnétique le plus intense connu. Le 27 décembre 2004, un séisme à sa surface a libéré en 0,2 seconde l'énergie que le Soleil émet en 250 000 ans. Sa distance est mal connue."]
 ].forEach(a=>{const T=a[0]==='sgr1806'?45000:1e6;
  B.push({id:a[0],n:a[1],t:a[2],fx:a[3],R:10,Rs:10/RS,T:T,m:1.4*MS,ms:1.4,kind:'sun',cat:'ext',W:[0,14],ns:{P:a[4],Pv:a[5],B:a[6]},jet:{len:a[7]/1000,w:.09,col:a[0]==='sgr1806'?[1,.6,.9]:[.6,.8,1],I:1.3},axis:new THREE.Vector3(.25,.9,.35).normalize(),tint:bbcol(T).map((v,i)=>Math.pow(v/BBS[i],2)),col:a[0]==='sgr1806'?'#ffa8e0':'#a8d0ff',d:a[8]})});
+// Engins spatiaux. R = demi-envergure (km). Orbites terrestres : [demi-grand axe km, période j, excentricité, inclinaison °].
+const CRAFT_NOTE={orb:"Altitude, inclinaison et période réelles ; la position le long de l'orbite est indicative. Maquette simplifiée.",
+ far:"Distance et direction approchées (trajectoire rectiligne à vitesse constante), valables autour de la date actuelle. Maquette simplifiée.",
+ l2:"Placé au point de Lagrange L2 ; son orbite de halo autour de ce point n'est pas représentée. Maquette simplifiée."};
+[['iss','ISS','Station spatiale internationale','iss',.0545,'orb',{p:'terre',mo:[6791,.064463,.0005,51.64]},[['Premier module','20 novembre 1998'],['Masse','environ 420 tonnes'],['Dimensions','109 × 73 m'],['Altitude','environ 420 km'],['Tour de la Terre','92,8 min'],['Équipage habituel','7 personnes']],
+  "Le plus grand objet jamais assemblé dans l'espace, habité sans interruption depuis novembre 2000. Elle fait le tour de la Terre 15,5 fois par jour."],
+ ['hubble','Hubble','Télescope spatial','hst',.0066,'orb',{p:'terre',mo:[6901,.06604,.0003,28.47]},[['Lancement','24 avril 1990'],['Masse','11 tonnes'],['Longueur','13,2 m'],['Miroir','2,4 m'],['Altitude','environ 530 km'],['Tour de la Terre','95 min']],
+  "Plus de trente ans d'observations en lumière visible et ultraviolette. Les images des Piliers de la Création et de la nébuleuse du Crabe affichées ici viennent de lui."],
+ ['jwst','James Webb','Télescope spatial infrarouge','jwst',.0106,'l2',{l2:1,aimId:'soleil',ancId:'terre'},[['Lancement','25 décembre 2021'],['Masse','6,2 tonnes'],['Miroir','6,5 m, 18 segments en béryllium doré'],['Bouclier thermique','21 × 14 m'],['Position','point L2, à 1,5 million de km']],
+  "Il observe dans l'infrarouge, dos au Soleil. Son bouclier à cinq couches maintient le miroir à −233 °C."],
+ ['voyager1','Voyager 1','Sonde interstellaire','voy',.0075,'far',{far:[258.3,12.1,165.9,3.57],aimId:'terre',ancId:'soleil'},[['Lancement','5 septembre 1977'],['Masse','722 kg'],['Antenne','3,7 m'],['Espace interstellaire','depuis août 2012']],
+  "L'objet humain le plus lointain. Elle a survolé Jupiter et Saturne, puis quitté l'héliosphère en 2012. Elle emporte un disque d'or avec des sons et des images de la Terre."],
+ ['voyager2','Voyager 2','Sonde interstellaire','voy',.0075,'far',{far:[302,-59.2,139.2,3.23],aimId:'terre',ancId:'soleil'},[['Lancement','20 août 1977'],['Masse','722 kg'],['Antenne','3,7 m'],['Espace interstellaire','depuis novembre 2018']],
+  "La seule sonde à avoir survolé Uranus (1986) et Neptune (1989). Presque tout ce que l'on sait de près sur ces deux planètes vient d'elle."],
+ ['newhorizons','New Horizons','Sonde','nh',.0015,'far',{far:[291,-20.3,60.5,2.9],aimId:'terre',ancId:'soleil'},[['Lancement','19 janvier 2006'],['Masse','478 kg'],['Survol de Pluton','14 juillet 2015'],["Survol d'Arrokoth",'1er janvier 2019']],
+  "Elle a révélé Pluton en 2015 après neuf ans de voyage, puis Arrokoth, l'objet le plus lointain jamais survolé."]
+].forEach(a=>{const b=Object.assign({id:a[0],n:a[1],t:a[2],craft:a[3],R:a[4],nk:a[5],rows:a[7],d:a[8],cat:'craft',col:'#9fe0c8'},a[6]);
+ if(b.far){const f=b.far,v=eq2three(f[0],f[1]);b.dyn=(d,o)=>{const r=Math.max(1,f[2]+f[3]*(d-9131.5)/365.25)*AU;o[0]=v.x*r;o[1]=v.y*r;o[2]=v.z*r;return o}}
+ if(b.l2)b.dyn=(d,o)=>{bodyPos(EARTH,d,o);const k=1+1500/Math.hypot(o[0],o[1],o[2]);o[0]*=k;o[1]*=k;o[2]*=k;return o};
+ B.push(b)});
 const byId={};B.forEach((b,i)=>{byId[b.id]=b;b.i=i;b.pos=[0,0,0];b.rel=new THREE.Vector3();b.kids=[]});
 B.forEach(b=>{if(b.p){b.par=byId[b.p];b.par.kids.push(b)}});
 B.forEach(b=>{b.sys=b.mo?b.par:b;b.star=b.kind==='sun'?b:b.par?b.par.star:null});
@@ -321,6 +343,7 @@ const MOON_FRAC=7.342e22/(5.9724e24+7.342e22);
 function bodyPos(b,d,out){
   if(b===SUN){out[0]=out[1]=out[2]=0;return out}
   if(b.fp){out[0]=b.fp[0];out[1]=b.fp[1];out[2]=b.fp[2];return out}
+  if(b.dyn)return b.dyn(d,out);
   if(b.mo){bodyPos(b.par,d,out);const r=moonRel(b,d,[0,0,0]);out[0]+=r[0];out[1]+=r[1];out[2]+=r[2];return out}
   planetPos(b,d,out);
   if(b===EARTH){const r=moonRel(MOON,d,tmpA);out[0]-=r[0]*MOON_FRAC;out[1]-=r[1]*MOON_FRAC;out[2]-=r[2]*MOON_FRAC}
@@ -330,14 +353,16 @@ const ZEQ=eq2three(0,90);
 B.forEach((b,k)=>{
   if(b.pole){b.poleV=eq2three(b.pole[0],b.pole[1]);b.nodeV=eq2three(b.pole[0]+90,0)}
   else if(b.par)b.poleV=b.par.poleV;else{b.poleV=new THREE.Vector3(0,1,0);b.nodeV=new THREE.Vector3(1,0,0)}
+  if(b.craft){b.star=SUN;if(b.aimId)b.aim=byId[b.aimId];if(b.ancId)b.anc=byId[b.ancId]}
   if(b.fx){const v=eq2three(b.fx[0],b.fx[1]).multiplyScalar(b.fx[2]*LY);b.fp=[v.x,v.y,v.z];if(b.id==='alfcenb'){b.fp[0]+=3.1e6;b.fp[2]+=1.5e6}if(b.off){b.fp[0]+=b.off[0];b.fp[1]+=b.off[1];b.fp[2]+=b.off[2]}b.inMW=b.fx[2]<2e5}
 });
 B.forEach((b,k)=>{ if(b.mo&&b!==MOON){const P=b.par.poleV;b.fu=new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0),P);if(b.fu.lengthSq()<1e-6)b.fu.set(1,0,0);b.fu.normalize();b.fv=new THREE.Vector3().crossVectors(P,b.fu);b.M0=(k*2.399963)%TAU} });
 const mX=new THREE.Vector3(),mY=new THREE.Vector3(),mZ=new THREE.Vector3(),mM=new THREE.Matrix4();
 function bodyQuat(b,d,q){
-  if(b.mo){ // rotation synchrone : le méridien 0° pointe vers la planète
-    mX.set(b.par.pos[0]-b.pos[0],b.par.pos[1]-b.pos[1],b.par.pos[2]-b.pos[2]).normalize();
-    mY.copy(b===MOON?ZECL:b.poleV);if(b.mo[3]>90)mY.negate();mY.addScaledVector(mX,-mY.dot(mX)).normalize();
+  const tg=b.mo?b.par:b.aim;
+  if(tg){ // rotation synchrone : l'axe X pointe vers la planète (lunes) ou vers la cible (antennes, bouclier)
+    mX.set(tg.pos[0]-b.pos[0],tg.pos[1]-b.pos[1],tg.pos[2]-b.pos[2]).normalize();
+    mY.copy(b===MOON?ZECL:b.poleV);if(b.mo&&b.mo[3]>90)mY.negate();mY.addScaledVector(mX,-mY.dot(mX)).normalize();
   }else{const W=((b.W[0]+b.W[1]*d)%360)*D2R;mY.copy(b.poleV);mZ.crossVectors(mY,b.nodeV);
     mX.copy(b.nodeV).multiplyScalar(Math.cos(W)).addScaledVector(mZ,Math.sin(W));}
   mZ.crossVectors(mX,mY);mM.makeBasis(mX,mY,mZ);return q.setFromRotationMatrix(mM)}
@@ -587,6 +612,46 @@ void main(){
  float k=.55+.9*vnoise(vec3(vUv.y*16.-uClock*.12,1.,2.));
  gl_FragColor=vec4(uCol*uI*e*f*k,1.);
 }`;
+const CRAFT_F=`
+#include <common>
+#include <logdepthbuf_pars_fragment>
+uniform vec3 uSun,uCol;uniform float uSpec;varying vec3 vW;
+void main(){
+#include <logdepthbuf_fragment>
+ vec3 n=normalize(cross(dFdx(vW),dFdy(vW)));vec3 V=normalize(-vW);if(dot(n,V)<0.)n=-n;
+ float d=max(dot(n,uSun),0.);float sp=pow(max(dot(n,normalize(uSun+V)),0.),30.)*uSpec;
+ gl_FragColor=vec4(uCol*(d*1.05+.16)+vec3(1.,.96,.9)*sp,1.);
+}`;
+// Maquettes : rayon 1 = demi-envergure. L'axe X pointe vers la Terre (ISS, Hubble, sondes) ou vers le Soleil (James Webb).
+function buildCraft(b){
+  const g=new THREE.Group(),U={uRot:{value:new THREE.Matrix3()},uSun:{value:new THREE.Vector3(1,0,0)},uSunAng:{value:0},uPx:{value:0},uOcc:{value:[0,1,2,3].map(()=>new THREE.Vector4())}};
+  b.mat={uniforms:U};const mats={},H=Math.PI/2,WH='#d9dadd',PAN='#1b2a55',GOLD='#e0a93a',DK='#3a3c42',GR='#a9abb0';
+  const M=(c,sp)=>mats[c+sp]||(mats[c+sp]=new THREE.ShaderMaterial({vertexShader:VERT,fragmentShader:CRAFT_F,side:THREE.DoubleSide,extensions:{derivatives:true},uniforms:{uSun:U.uSun,uCol:{value:lin(c)},uSpec:{value:sp}}}));
+  const add=(geo,c,sp,x,y,z,rx,ry,rz)=>{const m=new THREE.Mesh(geo,M(c,sp||0));m.position.set(x||0,y||0,z||0);m.rotation.set(rx||0,ry||0,rz||0);m.frustumCulled=false;g.add(m);return m};
+  const box=(w,h,d,c,sp,x,y,z,rx,ry,rz)=>add(new THREE.BoxGeometry(w,h,d),c,sp,x,y,z,rx,ry,rz);
+  const cyl=(r1,r2,h,n,c,sp,x,y,z,rx,ry,rz,open)=>add(new THREE.CylinderGeometry(r1,r2,h,n,1,!!open),c,sp,x,y,z,rx,ry,rz);
+  if(b.craft==='iss'){
+    box(.05,.05,1.98,'#b9bbc0',.2);
+    [-.93,-.66,.66,.93].forEach(z=>[-1,1].forEach(s=>box(.008,.6,.21,PAN,.7,0,s*.36,z)));
+    [-.3,.3].forEach(z=>box(.008,.26,.11,WH,.3,0,-.19,z));
+    cyl(.042,.042,.95,16,WH,.3);cyl(.038,.038,.36,16,WH,.3,0,.3,0,H);cyl(.038,.038,.3,16,WH,.3,0,-.12,0,H);cyl(.035,.035,.22,16,WH,.3,.1,-.3,0,0,0,H);
+  }else if(b.craft==='hst'){
+    cyl(.32,.32,1.25,24,'#c8cbd2',.9,-.38,0,0,0,0,H);cyl(.37,.37,.75,24,'#b4b8c0',.8,.62,0,0,0,0,H);
+    box(.02,.62,.62,'#c8cbd2',.6,-1.12,.36,0,0,0,-.75);
+    [-1,1].forEach(s=>{box(1.08,.012,.4,PAN,.7,0,0,s*.72);box(.03,.03,.22,DK,0,0,0,s*.42)});
+    cyl(.01,.01,.5,6,GR,.2,.3,.5,0);cyl(.06,.06,.01,12,WH,.3,.3,.75,0);
+  }else if(b.craft==='jwst'){
+    [0,-.035,-.07].forEach((x,i)=>{const m=cyl(1,1,.008,4,i?'#cdbfd6':'#e6dcea',.9,x,0,0,0,0,H);m.scale.set(.67,1,1)});
+    cyl(.31,.31,.025,6,GOLD,1,-.42,0,0,H);box(.012,.012,.5,DK,0,-.42,0,.25);box(.012,.3,.012,DK,0,-.28,0,.38,.5);cyl(.04,.04,.01,6,GOLD,1,-.42,0,.5,H);
+    box(.16,.22,.22,'#8d8f96',.3,.1);box(.012,.1,.4,PAN,.7,.2,-.5,0);
+  }else if(b.craft==='voy'){
+    cyl(.25,.04,.09,28,WH,.4,.05,0,0,0,0,-H,true);cyl(.12,.12,.06,10,DK,.2,-.03,0,0,0,0,H);
+    box(.01,1.7,.01,GR,.2,-.03,.95,0);cyl(.03,.03,.42,10,'#55575c',.3,-.03,-.36,0);
+    box(.012,.012,.42,GR,.2,-.03,0,.33);box(.07,.07,.07,WH,.3,-.03,0,.56);cyl(.04,.04,.008,20,GOLD,1,-.03,0,-.125,H);
+  }else{
+    cyl(.7,.1,.22,28,WH,.4,.14,0,0,0,0,-H,true);cyl(.55,.55,.26,3,GOLD,.6,-.12,0,0,0,0,H);cyl(.09,.09,.7,10,DK,.3,-.12,-.8,0);
+  }
+  g.scale.setScalar(b.Rm);g.visible=false;scene.add(g);b.mesh=g}
 const jetGeo=new THREE.CylinderGeometry(1,.004,1,64,1,true);jetGeo.translate(0,.5,0);
 const YAX=new THREE.Vector3(0,1,0);
 const plane=new THREE.PlaneGeometry(2,2);
@@ -596,6 +661,7 @@ const sphere=new THREE.SphereGeometry(1,128,64);
 const clockU={value:0};
 B.forEach((b,k)=>{
   b.Rm=b.R/1000;
+  if(b.craft){buildCraft(b);return}
   if(b.jet){const jm=new THREE.ShaderMaterial({vertexShader:JET_V,fragmentShader:JET_F,transparent:true,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending,uniforms:{uCol:{value:new THREE.Vector3().fromArray(b.jet.col)},uI:{value:b.jet.I},uClock:clockU}});
     b.jets=(b.jet.one?[1]:[1,-1]).map(sg=>{const m=new THREE.Mesh(jetGeo,jm);m.frustumCulled=false;m.renderOrder=5;m.userData.sg=sg;m.visible=false;scene.add(m);return m})}
   if(b.kind==='bh'){const e1=new THREE.Vector3().crossVectors(b.axis,new THREE.Vector3(.31,.2,.93)).normalize(),e2=new THREE.Vector3().crossVectors(b.axis,e1);
@@ -790,7 +856,7 @@ function arrive(b){if(b===MW)return b.Rm*1.25/Math.tan(halfFov());
   if(b.flat){const v=camera.fov*D2R/2;return Math.max(b.Rm/b.asp/Math.tan(v),b.Rm/(Math.tan(v)*camera.aspect))*1.04}
   if(b.ns)return b.jet.len*4.5;
   const k=b.kind==='bh'?b.disc[1]*1.25:b.ring===1?2.6:b.kind==='sun'?1.5:1;return b.Rm*k/Math.sin(halfFov()*.56)}
-const minDist=b=>b.flat?b.Rm*.1:b.kind==='bh'?b.Rm*2.2:b.Rm*1.12;
+const minDist=b=>b.flat?b.Rm*.1:b.kind==='bh'?b.Rm*2.2:b.craft?b.Rm*1.5:b.Rm*1.12;
 function setFocus(b,instant){if(b===S.focus&&!instant)return;S.prev=S.focus;S.focus=b;S.d0=S.dist;S.distT=arrive(b);S.tab=b.cat;
   const sep=Math.hypot(b.pos[0]-S.prev.pos[0],b.pos[1]-S.prev.pos[1],b.pos[2]-S.prev.pos[2]);
   S.sep=sep;S.trDur=instant||reduce?.001:Math.min(5.5,1.4+.55*Math.log10(1+sep/50));S.tr=instant?1:0;if(instant){S.dist=S.distT}
@@ -801,12 +867,12 @@ function setFocus(b,instant){if(b===S.focus&&!instant)return;S.prev=S.focus;S.fo
 const $=id=>document.getElementById(id);
 const labels=$('labels');
 B.forEach(b=>{const e=document.createElement('button');e.className='lb'+(b.mo?' moon':b.cat!=='sol'?' far':'');e.textContent=b.n;e.hidden=true;e.tabIndex=-1;e.addEventListener('click',()=>setFocus(b));labels.appendChild(e);b.lb=e});
-const TABS=[['sol','Système solaire'],['star','Étoiles'],['neb','Nébuleuses'],['ext','Extrêmes'],['gal','Galaxies']];
+const TABS=[['sol','Système solaire'],['craft','Engins'],['star','Étoiles'],['neb','Nébuleuses'],['ext','Extrêmes'],['gal','Galaxies']];
 function renderRail(){const tb=$('tabs');tb.textContent='';
   TABS.forEach(t=>{const e=document.createElement('button');e.className='tab';e.textContent=t[1];e.setAttribute('aria-pressed',S.tab===t[0]);e.addEventListener('click',()=>{S.tab=t[0];renderRail()});tb.appendChild(e)});
   const r=$('rail');r.textContent='';
-  B.filter(b=>b.cat===S.tab&&!b.mo).forEach(b=>{add(b);if(S.focus.sys===b)b.kids.forEach(k=>{if(k.mo)add(k)})});
-  function add(b){const c=document.createElement('button');c.className='chip'+(b.mo?' moon':'');c.style.setProperty('--c',b.col);c.innerHTML='<i></i>';c.append(b.n);
+  B.filter(b=>b.cat===S.tab&&(!b.mo||b.craft)).forEach(b=>{add(b);if(S.focus.sys===b&&!b.craft)b.kids.forEach(k=>{if(k.mo&&!k.craft)add(k)})});
+  function add(b){const c=document.createElement('button');c.className='chip'+(b.mo&&!b.craft?' moon':'');c.style.setProperty('--c',b.col);c.innerHTML='<i></i>';c.append(b.n);
     if(b===S.focus)c.setAttribute('aria-current','true');c.addEventListener('click',()=>setFocus(b));r.appendChild(c);
     if(b===S.focus)requestAnimationFrame(()=>{const x=c.offsetLeft-(r.clientWidth-c.offsetWidth)/2;r.scrollTo({left:x,behavior:reduce?'auto':'smooth'})})}
   if(!r.querySelector('[aria-current]'))r.scrollLeft=0}
@@ -815,7 +881,7 @@ const SUP='⁰¹²³⁴⁵⁶⁷⁸⁹';
 function sci(v){const e=Math.floor(Math.log10(v));return nf(v/Math.pow(10,e),3)+' × 10'+String(e).split('').map(c=>c==='-'?'⁻':SUP[c]).join('')}
 const KMLY=9.4607e12;
 function fLy(ly){const a=Math.abs(ly);return a>=1e9?nf(ly/1e9,2)+" milliards d'al":a>=1e6?nf(ly/1e6,2)+" millions d'al":a>=1e4?nf(Math.round(ly/100)*100,0)+' al':a>=100?nf(ly,0)+' al':nf(ly,a<10?2:1)+' al'}
-function fDist(km){const a=Math.abs(km);if(a>=KMLY*.05)return fLy(km/KMLY);if(a>=1.5e7)return nf(km/149597870.7,a>=1.5e9?a>=1.5e11?0:2:3)+' UA';if(a>=1e6)return nf(km/1e6,2)+' millions de km';return nf(km,a<100?1:0)+' km'}
+function fDist(km){const a=Math.abs(km);if(a>=KMLY*.05)return fLy(km/KMLY);if(a>=1.5e7)return nf(km/149597870.7,a>=1.5e9?a>=1.5e11?0:2:3)+' UA';if(a>=1e6)return nf(km/1e6,2)+' millions de km';if(a<1)return nf(km*1000,0)+' m';return nf(km,a<100?1:0)+' km'}
 function fDur(days){const a=Math.abs(days);if(a>=365.25*1.5)return nf(a/365.25,2)+' ans';if(a>=3)return nf(a,2)+' jours';const h=a*24;if(h>=1){const hh=Math.floor(h),mm=Math.round((h-hh)*60);return hh+' h '+String(mm).padStart(2,'0')+' min'}return Math.round(h*60)+' min'}
 function fLight(km){const s=km/299792.458;if(s<90)return nf(s,1)+' s';if(s<5400)return Math.floor(s/60)+' min '+String(Math.round(s%60)).padStart(2,'0')+' s';return nf(s/3600,2)+' h'}
 const live={};
@@ -826,6 +892,10 @@ function renderSheet(full){const b=S.focus,el=$('sheet');
       if(b===MW)rows.push(['Étoiles','100 à 400 milliards'],['Âge','13,6 milliards d\'années'],['Tour du Soleil','230 millions d\'années']);
       else rows.push(['Lumière partie il y a',b.fx[2]>=1e6?nf(b.fx[2]/1e6,1)+" millions d'années":nf(b.fx[2],0)+' ans']);
       if(b.cred)note='Image : '+b.cred+'. Vue depuis la Terre ; elle reste face à vous quand vous tournez.'}
+    else if(b.craft){b.rows.forEach(r=>rows.push(r));
+      if(b.mo)rows.push(['Vitesse orbitale','<span id="lvV"></span>']);
+      else rows.push(['Distance au Soleil','<span id="lvS"></span>'],['Distance à la Terre','<span id="lvE"></span>'],['Délai radio','<span id="lvR"></span>'],['Vitesse','<span id="lvV"></span>']);
+      note=CRAFT_NOTE[b.nk]}
     else if(b.kind==='bh'){const M=b.ms;rows.push(['Type',b.t],['Masse',(M>=1e9?nf(M/1e9,2)+' milliards de':M>=1e6?nf(M/1e6,2)+' millions de':nf(M,1))+' M☉'],['Rayon de l\'horizon',fDist(b.R)],['Distance',fLy(b.fx[2])],['Lumière partie il y a',b.fx[2]>=1e9?nf(b.fx[2]/1e9,2)+" milliards d'années":b.fx[2]>=1e6?nf(b.fx[2]/1e6,1)+" millions d'années":nf(b.fx[2],0)+' ans']);
       note="La déviation de la lumière est calculée rayon par rayon (métrique de Schwarzschild) : l'ombre, l'anneau de photons et l'image du disque repliée au-dessus du trou noir en découlent. La rotation du disque est mise à une vitesse visible et le fond du ciel n'est pas déformé."}
     else if(b.ns){rows.push(['Distance',fLy(b.fx[2])],['Rayon','environ 10 km'],['Masse','1,4 M☉'],['Densité','≈ 7 × 10¹⁴ g/cm³'],['Période de rotation',b.ns.P<1?nf(b.ns.P*1000,1)+' ms':nf(b.ns.P,2)+' s'],['Champ magnétique',b.ns.B]);
@@ -844,13 +914,13 @@ function renderSheet(full){const b=S.focus,el=$('sheet');
       if(b.exo)note="Orbite, taille et masse mesurées. L'aspect de la surface est imaginé : aucune image de cette planète n'existe.";
       else if(b.mo&&b!==MOON)note="Période et taille d'orbite réelles ; la position le long de l'orbite est indicative."}
     el.innerHTML=(b.d?'<p>'+b.d+'</p>':'')+'<dl>'+rows.map(r=>'<dt>'+r[0]+'</dt><dd>'+r[1]+'</dd>').join('')+'</dl>'+(note?'<p class="note">'+note+'</p>':'');
-    live.S=$('lvS');live.L=$('lvL');live.V=$('lvV');live.E=$('lvE');el.scrollTop=0}
+    live.S=$('lvS');live.L=$('lvL');live.V=$('lvV');live.E=$('lvE');live.R=$('lvR');el.scrollTop=0}
   const p=b.pos;
-  if(live.S){const r=Math.hypot(p[0],p[1],p[2])*1000;live.S.textContent=fDist(r);live.L.textContent=fLight(r);
+  if(live.S||live.V){const r=Math.hypot(p[0],p[1],p[2])*1000;if(live.S)live.S.textContent=fDist(r);if(live.L)live.L.textContent=fLight(r);
     const h=1e-3,p2=bodyPos(b,S.d+h,[0,0,0]);let v;
     if(b.mo){const q1=b.par.pos,q2=bodyPos(b.par,S.d+h,[0,0,0]);v=Math.hypot(p2[0]-q2[0]-p[0]+q1[0],p2[1]-q2[1]-p[1]+q1[1],p2[2]-q2[2]-p[2]+q1[2])}else v=Math.hypot(p2[0]-p[0],p2[1]-p[1],p2[2]-p[2]);
-    live.V.textContent=nf(v*1000/(h*86400),2)+' km/s'}
-  if(live.E){const e=EARTH.pos;live.E.textContent=fDist(Math.hypot(p[0]-e[0],p[1]-e[1],p[2]-e[2])*1000)}}
+    if(live.V)live.V.textContent=nf(v*1000/(h*86400),2)+' km/s'}
+  if(live.E){const e=EARTH.pos,de=Math.hypot(p[0]-e[0],p[1]-e[1],p[2]-e[2])*1000;live.E.textContent=fDist(de);if(live.R)live.R.textContent=fLight(de)}}
 const dfD=new Intl.DateTimeFormat('fr-FR',{day:'numeric',month:'short',year:'numeric'}),dfT=new Intl.DateTimeFormat('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}),dfM=new Intl.DateTimeFormat('fr-FR',{hour:'2-digit',minute:'2-digit'});
 function renderClock(){const ms=(S.d+10957.5)*864e5,dt=new Date(ms),r=Math.abs(RATES[S.ri]);let t;
   if(isNaN(dt)){t='—'}else t=dfD.format(dt)+(r>=604800?'':' · '+(r>=3600?dfM:dfT).format(dt));
@@ -894,6 +964,18 @@ const TOURS=[
  ['andromede',"Andromède, la grande galaxie voisine, à 2,5 millions d'années-lumière. Sa lumière est partie à l'époque des premiers outils de pierre taillée."],
  ['m87gal',"M87, à 53 millions d'années-lumière. Le trait bleu est un jet de matière de 5 000 années-lumière, lancé par son trou noir central."],
  ['q3c273',"Le quasar 3C 273. Sa lumière a voyagé 2,4 milliards d'années : à son départ, la vie sur Terre se résumait à des microbes."]]},
+{n:'Les étoiles par taille croissante',s:"De la Terre à Bételgeuse, avec un cercle de comparaison à chaque étape",st:[
+ ['terre',"Point de repère : la Terre, 12 742 km de diamètre. Tout ce qui suit est plus grand."],
+ ['jupiter',"Jupiter, la plus grosse planète : 11 fois le diamètre de la Terre. Le cercle montre la Terre à la même échelle.",['Terre',6371]],
+ ['trappist1',"TRAPPIST-1, l'une des plus petites étoiles connues : à peine 20 % plus large que Jupiter, mais 94 fois plus massive.",['Jupiter',69911]],
+ ['soleil',"Le Soleil : 1,39 million de km de diamètre, 10 fois Jupiter. C'est une étoile de taille moyenne.",['Jupiter',69911]],
+ ['sirius',"Sirius, l'étoile la plus brillante de notre ciel : 1,7 fois le diamètre du Soleil.",['Soleil',695700]],
+ ['arcturus',"Arcturus, une géante rouge : 25 fois le diamètre du Soleil. Le Soleil gonflera de cette façon à la fin de sa vie.",['Soleil',695700]],
+ ['aldebaran',"Aldébaran, l'œil du Taureau : 45 fois le Soleil.",['Arcturus',25.4*695700]],
+ ['rigel',"Rigel, une supergéante bleue : 79 fois le diamètre du Soleil, et environ 120 000 fois sa luminosité.",['Aldébaran',45.1*695700]],
+ ['deneb',"Deneb : 203 fois le Soleil. À sa place, elle engloberait Mercure, dont le cercle montre l'orbite.",['Orbite de Mercure',57909000]],
+ ['antares',"Antarès : 680 fois le Soleil. À sa place, elle engloberait Mercure, Vénus, la Terre et Mars. Le cercle montre l'orbite de la Terre.",['Orbite de la Terre',149597870]],
+ ['betelgeuse',"Bételgeuse : environ 760 fois le Soleil, soit un milliard de km de diamètre. La lumière met près d'une heure à la traverser. Le cercle montre l'orbite de Mars.",['Orbite de Mars',227940000]]]},
 {n:'Vie et mort des étoiles',s:"De la nébuleuse au trou noir, en 8 étapes",st:[
  ['orion',"Les étoiles naissent dans des nuages de gaz et de poussière comme celui-ci. La nébuleuse d'Orion en fabrique des centaines en ce moment."],
  ['piliers',"Dans les Piliers de la Création, le gaz s'effondre sous son propre poids. Au sommet des colonnes, de nouvelles étoiles s'allument."],
@@ -920,9 +1002,10 @@ function openPanel(m){
   else TOURS.forEach(T=>{const e=document.createElement('button');e.className='it col';const s=document.createElement('span');s.textContent=T.s;e.append(T.n,s);e.addEventListener('click',()=>{openPanel(null);tourStart(T)});panel.appendChild(e)})}
 $('bFind').onclick=()=>openPanel('find');$('bTour').onclick=()=>openPanel('tour');
 function tourShow(){const st=tour.T.st[tour.i],b=byId[st[0]];$('capN').textContent=tour.T.n+' · '+(tour.i+1)+' / '+tour.T.st.length;$('capT').textContent=st[1];
+  tour.ref=st[2]||null;$('ref').hidden=!tour.ref;if(tour.ref)$('ref').firstElementChild.textContent=tour.ref[0];
   tour.el=0;tour.dur=8+st[1].length*.055;if(b!==S.focus)setFocus(b);else S.distT=arrive(b)}
 function tourStart(T){tour={T,i:0,el:0,dur:10,hold:false};$('cap').hidden=false;$('hint').hidden=true;$('tabs').hidden=$('rail').hidden=$('sheet').hidden=true;$('tHold').textContent='❚❚';tourShow()}
-function tourEnd(){tour=null;$('cap').hidden=true;$('tabs').hidden=$('rail').hidden=false;$('sheet').hidden=!S.info;renderRail();if(S.info)renderSheet(true)}
+function tourEnd(){tour=null;$('ref').hidden=true;$('cap').hidden=true;$('tabs').hidden=$('rail').hidden=false;$('sheet').hidden=!S.info;renderRail();if(S.info)renderSheet(true)}
 function tourStep(k){const i=tour.i+k;if(i>=tour.T.st.length){tourEnd();return}tour.i=Math.max(0,i);tourShow()}
 $('tPrev').onclick=()=>tourStep(-1);$('tNext').onclick=()=>tourStep(1);$('tQuit').onclick=tourEnd;
 $('tHold').onclick=()=>{tour.hold=!tour.hold;$('tHold').textContent=tour.hold?'▶':'❚❚';$('tHold').setAttribute('aria-label',tour.hold?'Reprendre la visite':'Mettre la visite en pause')};
@@ -967,7 +1050,7 @@ function frame(now){
   vT.set(cp*Math.sin(S.yaw),Math.sin(S.pitch),cp*Math.cos(S.yaw));
   camPos[0]=fp[0]+vT.x*D;camPos[1]=fp[1]+vT.y*D;camPos[2]=fp[2]+vT.z*D;
   camera.position.set(0,0,0);camera.up.set(0,1,0);camera.lookAt(-vT.x,-vT.y,-vT.z);
-  camera.near=Math.min(1e5,Math.max(1e-4,f.flat?D*.01:(D-f.Rm)*.02));camera.far=1e17;camera.updateProjectionMatrix();camera.updateMatrixWorld(true);
+  camera.near=Math.min(1e5,Math.max(1e-7,f.flat?D*.01:(D-f.Rm)*.02));camera.far=1e17;camera.updateProjectionMatrix();camera.updateMatrixWorld(true);
   fwd.set(-vT.x,-vT.y,-vT.z);
   const pxK=S.H/2/Math.tan(camera.fov*D2R/2);
   // --- changement d'échelle : le ciel fixe laisse place à la galaxie en volume entre 3 000 et 20 000 al du Soleil
@@ -977,7 +1060,7 @@ function frame(now){
   B.forEach((b,i)=>{b.rel.set(b.pos[0]-camPos[0],b.pos[1]-camPos[1],b.pos[2]-camPos[2]);b.dist=b.rel.length();b.px=b.Rm/b.dist*pxK;
     const z=b.rel.dot(fwd);b.onScreen=z>0;
     if(b.onScreen){vS.copy(b.rel).project(camera);b.sx=(vS.x*.5+.5)*S.W;b.sy=(-vS.y*.5+.5)*S.H;b.onScreen=b.sx>-60&&b.sx<S.W+60&&b.sy>-60&&b.sy<S.H+60}
-    const an=b.par||(b!==SUN&&b.inMW?SUN:null);
+    const an=b.par||b.anc||(b!==SUN&&b.inMW?SUN:null);
     b.sepPx=an?(b.onScreen&&an.onScreen?Math.hypot(b.sx-an.sx,b.sy-an.sy):999):999;
     const kc=b.dist>FARC?FARC/b.dist:1;mkPos[i*3]=b.rel.x*kc;mkPos[i*3+1]=b.rel.y*kc;mkPos[i*3+2]=b.rel.z*kc;let ma=0;
     if(b.kind==='bh'){const big=b.px*b.disc[1];ma=.75*(1-sat((big-1.5)/3));const vis=big>1.2;b.mesh.visible=vis;
@@ -1036,11 +1119,13 @@ function frame(now){
     if(show&&b===MW)show=gf>.5&&b.px<S.H*.2;
     if(show&&b.inMW&&b!==f&&b!==MW&&MW.px<140&&gf>.5)show=false;
     if(show&&b.kind==='sun'&&b!==f&&(b===SUN?gf>.5&&MW.px<60:b.ma<.06))show=false;
-    if(show&&b.cat==='sol'&&!b.mo&&b!==SUN&&gf>.01)show=false;
+    if(show&&(b.cat==='sol'||b.cat==='craft')&&!b.mo&&b!==SUN&&gf>.01)show=false;
     if(show&&b!==f&&!f.flat&&b.dist>f.dist&&Math.hypot(b.sx-f.sx,b.sy-f.sy)<f.px)show=false;
     if(show&&b!==f&&f.onScreen&&Math.hypot(b.sx-f.sx,b.sy-f.sy)<24)show=false;
     b.shown=show||b.px>3;show=show&&S.labels;
     if(show){e.hidden=false;const o=b.flat?10:Math.min(b.px,400)*.72+4;e.style.transform='translate('+(b.sx+o).toFixed(1)+'px,'+(b.sy-10-o).toFixed(1)+'px)'}else if(!e.hidden)e.hidden=true});
+  if(tour&&tour.ref){const e=$('ref'),ok=S.tr>=1&&f.onScreen;e.style.opacity=ok?1:0;
+    if(ok){const r=Math.max(2,tour.ref[1]/1000/f.dist*pxK);e.style.width=e.style.height=(2*r).toFixed(1)+'px';e.style.transform='translate('+(f.sx-r).toFixed(1)+'px,'+(f.sy-r).toFixed(1)+'px)'}}
   composer.render();
   // --- lectures (4 fois par seconde)
   acc+=dt;if(acc>.25){acc=0;$('range').textContent='à '+fDist((f.flat?f.dist:f.dist-f.Rm)*1000);renderClock();if(S.info)renderSheet(false)}

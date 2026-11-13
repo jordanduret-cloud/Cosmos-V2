@@ -11,11 +11,12 @@ Après une modification, changer `VERSION` dans `sw.js` pour que les appareils d
 ## Contenu
 
 - **Système solaire** : Soleil, 8 planètes, Pluton, 20 lunes, ceinture principale, troyens et ceinture de Kuiper. Positions calculées à la date affichée (éléments képlériens JPL).
+- **Engins** : ISS, Hubble, James Webb, Voyager 1 et 2, New Horizons, en maquettes simplifiées.
 - **Étoiles** : 41 000 étoiles réelles jusqu'à la magnitude 8, 19 étoiles où se rendre, TRAPPIST-1 et ses 7 planètes.
 - **Nébuleuses** : images d'observatoire placées à leur distance et à leur taille réelles.
 - **Extrêmes** : trous noirs avec déviation de la lumière calculée rayon par rayon, pulsars, magnétar, quasar.
 - **Galaxies** : modèle 3D de la Voie lactée, Andromède, Triangle, Tourbillon, Sombrero, M87.
-- Recherche par nom, fiches détaillées, contrôle du temps, trois visites guidées.
+- Recherche par nom, fiches détaillées, contrôle du temps, quatre visites guidées.
 
 ## Fichiers
 
@@ -26,6 +27,7 @@ Après une modification, changer `VERSION` dans `sw.js` pour que les appareils d
 
 ## Limites connues
 
+- Les sondes lointaines suivent une trajectoire rectiligne approchée, valable autour de la date actuelle ; la position de l'ISS et de Hubble sur leur orbite est indicative.
 - Les lunes autres que la Lune ont la bonne orbite et la bonne période, mais une position indicative le long de l'orbite.
 - Les nébuleuses et galaxies lointaines sont des images plates qui font face à la caméra.
 - La surface des exoplanètes est imaginée. La forme des bras de la Voie lactée est un modèle.
