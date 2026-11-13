@@ -10,7 +10,7 @@ Après une modification, changer `VERSION` dans `sw.js` pour que les appareils d
 
 ## Contenu
 
-- **Système solaire** : Soleil, 8 planètes, Pluton, 20 lunes, ceinture principale, troyens et ceinture de Kuiper. Positions calculées à la date affichée (éléments képlériens JPL).
+- **Système solaire** : Soleil, 8 planètes, Pluton, 28 lunes, ceinture principale, troyens, ceinture de Kuiper et nuage d'Oort (hypothétique). Positions calculées à la date affichée (éléments képlériens JPL).
 - **Engins** : ISS, Hubble, James Webb, Voyager 1 et 2, New Horizons, en maquettes simplifiées.
 - **Étoiles** : 41 000 étoiles réelles jusqu'à la magnitude 8, 19 étoiles où se rendre, TRAPPIST-1 et ses 7 planètes.
 - **Nébuleuses** : images d'observatoire placées à leur distance et à leur taille réelles.
