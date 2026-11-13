@@ -1,0 +1,1152 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#04060b">
+<meta name="description" content="L'univers en 3D et en zoom continu, du système solaire aux quasars.">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>COSMOS</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout : la scène 3D occupe tout l'écran ; l'interface est un instrument posé dessus —
+   identité de l'astre en haut à gauche, fiche éphéméride repliable, rail des astres et barre de temps en bas. */
+:root{
+  color-scheme:dark;
+  --void:#04060b;            /* fond spatial */
+  --glass:rgba(9,13,22,.66); /* panneaux */
+  --line:rgba(160,185,230,.16);
+  --fg:#e8eef8;
+  --dim:#8f9bb3;
+  --sun:#ffb84d;             /* accent : lumière solaire */
+  --display:"Unbounded","Arial Black",system-ui,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--void);color:var(--fg);font-family:var(--body);overflow:hidden;overscroll-behavior:none;-webkit-user-select:none;user-select:none}
+canvas#gl{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;outline:none}
+#labels{position:fixed;inset:0;pointer-events:none;overflow:hidden}
+.lb{position:absolute;left:0;top:0;font:500 11px/1 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--fg);opacity:.8;white-space:nowrap;padding:8px 6px;pointer-events:auto;cursor:pointer;background:none;border:0;text-shadow:0 0 6px #000,0 0 2px #000;will-change:transform}
+.lb.moon{font-size:10px;color:var(--dim)}
+.lb.far{font-size:10px;letter-spacing:.1em;opacity:.62}
+#ref{position:absolute;left:0;top:0;box-sizing:border-box;border:1.5px solid var(--fg);border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.65),inset 0 0 0 1px rgba(0,0,0,.65);pointer-events:none;transition:opacity .5s}
+#ref span{position:absolute;left:50%;top:100%;transform:translateX(-50%);margin-top:6px;white-space:nowrap;font:500 10px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--fg);text-shadow:0 0 6px #000,0 0 2px #000}
+#tabs{display:flex;gap:14px;overflow-x:auto;scrollbar-width:none;padding:2px 2px 0}
+#tabs::-webkit-scrollbar{display:none}
+.tab{flex:none;font:500 10px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim);background:none;border:0;border-bottom:1px solid transparent;padding:8px 0 6px;cursor:pointer;text-shadow:0 0 6px #000}
+.tab[aria-pressed="true"]{color:var(--sun);border-bottom-color:var(--sun)}
+.lb:hover{opacity:1;color:var(--sun)}
+.ui{position:fixed;left:0;right:0;pointer-events:none;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;gap:12px}
+.ui>*{pointer-events:auto}
+#top{top:0;padding-top:calc(14px + env(safe-area-inset-top,0px));justify-content:space-between;align-items:flex-start}
+#ident{pointer-events:none;min-width:0}
+#brand{font:500 10px/1 var(--mono);letter-spacing:.32em;color:var(--sun);margin-bottom:10px}
+#name{font:600 clamp(22px,5.4vw,40px)/1.05 var(--display);letter-spacing:.01em;margin:0;text-wrap:balance}
+#kind{font-size:13px;color:var(--dim);margin-top:6px}
+#range{font:400 12px/1.4 var(--mono);color:var(--fg);margin-top:6px;font-variant-numeric:tabular-nums}
+#tools{display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;max-width:min(62%,460px)}
+.tb{font:500 11px/1 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--fg);background:var(--glass);border:1px solid var(--line);border-radius:999px;padding:10px 12px;cursor:pointer;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.tb[aria-pressed="true"]{border-color:var(--sun);color:var(--sun)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--sun);outline-offset:2px}
+#bottom{bottom:0;padding-bottom:calc(12px + env(safe-area-inset-bottom,0px));flex-direction:column;gap:8px}
+#sheet{box-sizing:border-box;align-self:flex-end;width:min(340px,100%);max-height:min(46vh,430px);overflow:auto;background:var(--glass);border:1px solid var(--line);border-radius:14px;padding:14px 16px;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);-webkit-user-select:text;user-select:text}
+#sheet p{margin:0 0 12px;font-size:13px;line-height:1.5;color:var(--fg)}
+#sheet dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:7px 14px;font-size:12px}
+#sheet dt{color:var(--dim)}
+#sheet dd{margin:0;text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
+#sheet .note{margin:12px 0 0;font-size:11px;color:var(--dim)}
+#rail{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin-inline:-4px;padding:2px 4px}
+#rail::-webkit-scrollbar{display:none}
+.chip{flex:none;display:flex;align-items:center;gap:7px;font:500 12px/1 var(--body);color:var(--fg);background:var(--glass);border:1px solid var(--line);border-radius:999px;padding:9px 12px;cursor:pointer;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.chip i{width:8px;height:8px;border-radius:50%;background:var(--c)}
+.chip.moon{font-size:11px;padding:9px 10px;color:var(--dim)}
+.chip.moon i{width:5px;height:5px}
+.chip[aria-current="true"]{border-color:var(--sun);color:var(--sun)}
+#time{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--glass);border:1px solid var(--line);border-radius:14px;padding:8px 10px;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+#clock{flex:1 1 150px;min-width:0}
+#date{font:500 14px/1.2 var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#rate{font-size:11px;color:var(--sun);margin-top:3px;font-family:var(--mono);letter-spacing:.04em}
+.tc{display:flex;gap:4px;align-items:center}
+.tc button{font:500 13px/1 var(--mono);color:var(--fg);background:transparent;border:1px solid var(--line);border-radius:9px;min-width:38px;height:36px;padding:0 9px;cursor:pointer}
+.tc button:active{background:rgba(255,184,77,.15)}
+#now{font-size:11px;letter-spacing:.05em;text-transform:uppercase}
+#jump{font:400 12px var(--mono);color:var(--fg);background:transparent;border:1px solid var(--line);border-radius:9px;height:36px;padding:0 6px;max-width:128px}
+#panel{position:fixed;top:60px;right:max(16px,env(safe-area-inset-right,0px));width:min(330px,calc(100% - 32px));max-height:min(58vh,460px);overflow:auto;background:var(--glass);border:1px solid var(--line);border-radius:14px;padding:10px 12px;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);z-index:5}
+#q{width:100%;box-sizing:border-box;font:400 14px var(--body);color:var(--fg);background:transparent;border:1px solid var(--line);border-radius:9px;height:38px;padding:0 10px;margin-bottom:4px;-webkit-user-select:text;user-select:text}
+.it{display:flex;justify-content:space-between;align-items:baseline;gap:12px;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);color:var(--fg);padding:11px 4px;font:500 13px/1.3 var(--body);cursor:pointer}
+.it:last-child{border-bottom:0}
+.it span{font-size:11px;font-weight:400;color:var(--dim);text-align:right}
+.it.col{flex-direction:column;gap:4px}
+.it.col span{text-align:left}
+.it:hover{color:var(--sun)}
+#panel .note{margin:10px 4px;font-size:12px;color:var(--dim)}
+#hint{align-self:center;font:500 11px/1.4 var(--mono);letter-spacing:.03em;color:var(--fg);background:var(--glass);border:1px solid var(--line);border-radius:14px;padding:8px 14px;text-align:center;pointer-events:none}
+#cap{position:relative;overflow:hidden;background:var(--glass);border:1px solid var(--line);border-radius:14px;padding:12px 14px 12px;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);max-width:640px}
+#capBar{position:absolute;left:0;right:0;top:0;height:2px}
+#capBar i{display:block;height:100%;background:var(--sun);transform-origin:left;transform:scaleX(0)}
+#capTop{display:flex;justify-content:space-between;align-items:center;gap:10px}
+#capN{font:500 10px/1.3 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--sun);min-width:0}
+#capT{margin:8px 0 0;font-size:15px;line-height:1.5;text-wrap:pretty}
+#load{position:fixed;inset:0;display:grid;place-items:center;background:var(--void);font:500 11px var(--mono);letter-spacing:.3em;color:var(--sun);transition:opacity .8s;pointer-events:none;text-align:center;padding:0 24px}
+#load.off{opacity:0}
+@media (max-width:560px){ .tb{padding:9px 10px;font-size:10px} #sheet{width:100%;max-height:36vh} }
+@media (prefers-reduced-motion:reduce){ #load{transition:none} }
+</style>
+</head>
+<body>
+
+<canvas id="gl" tabindex="0" aria-label="Vue 3D du système solaire"></canvas>
+<div id="labels"><div id="ref" hidden><span></span></div></div>
+
+<div class="ui" id="top">
+  <div id="ident">
+    <div id="brand">COSMOS</div>
+    <h1 id="name">Terre</h1>
+    <div id="kind"></div>
+    <div id="range"></div>
+  </div>
+  <div id="tools">
+    <button class="tb" id="bInfo" aria-pressed="true">Fiche</button>
+    <button class="tb" id="bOrb" aria-pressed="true">Orbites</button>
+    <button class="tb" id="bLab" aria-pressed="true">Noms</button>
+    <button class="tb" id="bFind" aria-pressed="false">Chercher</button>
+    <button class="tb" id="bTour" aria-pressed="false">Visites</button>
+  </div>
+</div>
+
+<section id="panel" hidden aria-label="Recherche et visites"></section>
+
+<div class="ui" id="bottom">
+  <div id="hint">Glisser pour tourner · pincer ou molette pour zoomer · toucher un astre pour s'y rendre</div>
+  <div id="cap" hidden>
+    <div id="capBar"><i></i></div>
+    <div id="capTop"><span id="capN"></span>
+      <span class="tc"><button id="tPrev" aria-label="Étape précédente">◀</button><button id="tHold" aria-label="Mettre la visite en pause">❚❚</button><button id="tNext" aria-label="Étape suivante">▶</button><button id="tQuit" aria-label="Quitter la visite">✕</button></span>
+    </div>
+    <p id="capT"></p>
+  </div>
+  <section id="sheet" aria-live="off"></section>
+  <div id="tabs" role="group" aria-label="Échelle"></div>
+  <nav id="rail" aria-label="Astres"></nav>
+  <div id="time">
+    <div id="clock"><div id="date">—</div><div id="rate">temps réel</div></div>
+    <div class="tc">
+      <button id="slow" aria-label="Ralentir ou inverser le temps">◀◀</button>
+      <button id="play" aria-label="Pause">❚❚</button>
+      <button id="fast" aria-label="Accélérer le temps">▶▶</button>
+      <button id="now">Maintenant</button>
+      <input type="date" id="jump" aria-label="Aller à une date">
+    </div>
+  </div>
+</div>
+<div id="load">CALCUL DES ÉPHÉMÉRIDES…</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script>
+(function(){
+'use strict';
+/* ============ constantes et unités ============
+   Unité de scène : 1 = 1000 km. Les positions sont calculées en double précision (JS),
+   puis soustraites à la position caméra : la caméra reste à l'origine (rendu relatif caméra). */
+const AU=149597.8707, D2R=Math.PI/180, TAU=Math.PI*2, EPS=23.4392911*D2R, G=6.6743e-11;
+const lin=h=>new THREE.Color(h).convertSRGBToLinear();
+const eq2three=(ra,dec)=>{ra*=D2R;dec*=D2R;const x=Math.cos(dec)*Math.cos(ra),y=Math.cos(dec)*Math.sin(ra),z=Math.sin(dec);
+  return new THREE.Vector3(x,-y*Math.sin(EPS)+z*Math.cos(EPS),-(y*Math.cos(EPS)+z*Math.sin(EPS)))};
+
+/* ============ données ============
+   Planètes : éléments képlériens moyens J2000 + dérives par siècle (JPL, « Approximate Positions of the Planets »).
+   el = [a UA, e, i°, L°, ϖ°, Ω°,  da, de, di, dL, dϖ, dΩ] */
+const B=[
+{id:'soleil',n:'Soleil',t:'Étoile · naine jaune G2V',R:695700,m:1.9885e30,pole:[286.13,63.87],W:[84.176,14.1844],tilt:7.25,temp:'5 500 °C en surface',col:'#ffd27a',kind:'sun',
+ d:"99,86 % de la masse du système solaire. Sa surface bouillonne en granules de la taille d'un pays ; sa lumière met plus de 8 minutes à atteindre la Terre."},
+{id:'mercure',n:'Mercure',t:'Planète tellurique',p:'soleil',R:2439.7,m:3.3011e23,pole:[281.01,61.41],W:[329.5469,6.1385025],tilt:0.034,temp:'−173 à 427 °C',col:'#a9a39a',
+ el:[0.38709927,0.20563593,7.00497902,252.2503235,77.45779628,48.33076593,3.7e-7,1.906e-5,-0.00594749,149472.67411175,0.16047689,-0.12534081],
+ s:{k:0,c:['#9c958a','#6a645c','#4b4741'],P:[3.2,.5,0,1.2],bump:1.1},
+ d:"La plus proche du Soleil et la plus rapide. Trois rotations pour deux révolutions : un jour solaire y dure 176 jours terrestres."},
+{id:'venus',n:'Vénus',t:'Planète tellurique',p:'soleil',R:6051.8,m:4.8675e24,pole:[272.76,67.16],W:[160.20,-1.4813688],tilt:177.36,temp:'464 °C',col:'#e8d7a0',
+ el:[0.72333566,0.00677672,3.39467605,181.9790995,131.60246718,76.67984255,3.9e-6,-4.107e-5,-0.0007889,58517.81538729,0.00268329,-0.27769418],
+ s:{k:3,c:['#efe2b8','#cdb277','#a98a55'],P:[2.2,1.4,0,0]},atm:['#f2deb0',.9,.014],
+ d:"Rotation rétrograde et très lente : son jour sidéral (243 j) dépasse son année. Une atmosphère de CO₂ de 92 bars masque entièrement le sol."},
+{id:'terre',n:'Terre',t:'Planète tellurique',p:'soleil',R:6371.0,m:5.9724e24,pole:[0,90],W:[190.147,360.9856235],tilt:23.44,temp:'15 °C en moyenne',col:'#6fa8ff',
+ el:[1.00000261,0.01671123,-0.00001531,100.46457166,102.93768193,0,5.62e-6,-4.392e-5,-0.01294668,35999.37244981,0.32327364,0],
+ s:{k:2,c:['#3a6ea8','#ffffff','#000000'],P:[0,0,0,0]},atm:['#5d9bff',1.25,.013],
+ d:"Affichée à l'heure réelle : le terminateur, les lumières des villes et la position de la Lune correspondent à la date indiquée."},
+{id:'mars',n:'Mars',t:'Planète tellurique',p:'soleil',R:3389.5,m:6.4171e23,pole:[317.68,52.89],W:[176.630,350.89198226],tilt:25.19,temp:'−65 °C en moyenne',col:'#e0764a',
+ el:[1.52371034,0.0933941,1.84969142,-4.55343205,-23.94362959,49.55953891,1.847e-5,7.882e-5,-0.00813131,19140.30268499,0.44441088,-0.29257343],
+ s:{k:0,c:['#cf7444','#a04e2a','#3f2620'],P:[2.4,1,.93,.5],bump:.8},atm:['#e0a37a',.45,.012],
+ d:"Un jour martien dure 24 h 37 min. Calottes polaires de glace d'eau et de CO₂, et la plus haute montagne connue : Olympus Mons, 21,9 km."},
+{id:'jupiter',n:'Jupiter',t:'Géante gazeuse',p:'soleil',R:69911,m:1.8982e27,pole:[268.06,64.50],W:[284.95,870.536],tilt:3.13,temp:'−110 °C au sommet des nuages',col:'#e2c39a',obl:.935,
+ el:[5.202887,0.04838624,1.30439695,34.39644051,14.72847983,100.47390909,-0.00011607,-0.00013253,-0.00183714,3034.74612775,0.21252668,0.20469106],
+ s:{k:1,c:['#efe3cc','#b98b62','#8a5234','#f6efe2'],P:[13,1.3,.85,1]},atm:['#d9c2a0',.35,.006],
+ d:"2,5 fois la masse de toutes les autres planètes réunies, et un tour sur elle-même en moins de 10 heures. La Grande Tache rouge est un anticyclone plus large que la Terre."},
+{id:'saturne',n:'Saturne',t:'Géante gazeuse',p:'soleil',R:58232,m:5.6834e26,pole:[40.59,83.54],W:[38.90,810.7939024],tilt:26.73,temp:'−140 °C au sommet des nuages',col:'#e6cf9a',obl:.902,ring:1,
+ el:[9.53667594,0.05386179,2.48599187,49.95424423,92.59887831,113.66242448,-0.0012506,-0.00050991,0.00193609,1222.49362201,-0.41897216,-0.28867794],
+ s:{k:1,c:['#ecdcae','#d6bd82','#bfa169','#f1e6c4'],P:[11,.7,.45,0]},atm:['#e6d3a3',.3,.006],
+ d:"Moins dense que l'eau. Ses anneaux s'étendent sur 282 000 km de diamètre pour une épaisseur de quelques dizaines de mètres ; la division de Cassini est visible ici."},
+{id:'uranus',n:'Uranus',t:'Géante de glaces',p:'soleil',R:25362,m:8.681e25,pole:[257.31,-15.18],W:[203.81,-501.1600928],tilt:97.77,temp:'−195 °C',col:'#a8e0e6',obl:.977,ring:2,
+ el:[19.18916464,0.04725744,0.77263783,313.23810451,170.9542763,74.01692503,-0.00196176,-4.397e-5,-0.00242939,428.48202785,0.40805281,0.04240589],
+ s:{k:1,c:['#b4e4e8','#9fd6dc','#8fcbd4','#c8eef0'],P:[5,.25,.2,0]},atm:['#a5e6ee',.6,.01],
+ d:"Couchée sur le côté : son axe est incliné de 98°, si bien que ses pôles font face au Soleil à tour de rôle pendant 42 ans."},
+{id:'neptune',n:'Neptune',t:'Géante de glaces',p:'soleil',R:24622,m:1.02413e26,pole:[299.36,43.46],W:[253.18,536.3128492],tilt:28.32,temp:'−200 °C',col:'#5b82f0',obl:.983,
+ el:[30.06992276,0.00859048,1.77004347,-55.12002969,44.96476227,131.78422574,0.00026291,5.105e-5,0.00035372,218.45945325,-0.32241464,-0.00508664],
+ s:{k:1,c:['#4468d8','#2f4fc0','#263f9c','#86a5f2'],P:[7,.6,.5,0]},atm:['#5d86ff',.7,.01],
+ d:"Les vents les plus rapides du système solaire, jusqu'à 2 100 km/h. Depuis sa découverte en 1846, elle n'a bouclé qu'une seule orbite."},
+{id:'pluton',n:'Pluton',t:'Planète naine',p:'soleil',R:1188.3,m:1.303e22,pole:[132.99,-6.16],W:[302.695,56.3625225],tilt:122.53,temp:'−229 °C',col:'#d2b79c',
+ el:[39.48211675,0.2488273,17.14001206,238.92903833,224.06891629,110.30393684,-0.00031596,5.17e-5,4.818e-5,145.20780515,-0.04062942,-0.01183482],
+ s:{k:4,c:['#d6c2a8','#8a644a','#f2ebe0'],P:[2.2,.35,0,0],bump:.4},atm:['#9fb8e0',.25,.02],
+ d:"Orbite inclinée de 17° et très excentrique. Pluton et Charon se font face en permanence, comme deux danseurs."},
+/* Lunes : a (km), période sidérale (j), e, inclinaison (° par rapport à l'équateur de la planète). */
+{id:'lune',n:'Lune',t:'Satellite de la Terre',p:'terre',R:1737.4,m:7.342e22,temp:'−173 à 127 °C',col:'#c9c6c0',mo:[384400,27.321661,.0549,5.145],
+ s:{k:0,c:['#a39f98','#77736d','#3f3d3b'],P:[2.6,.85,0,1.3],bump:1.2},d:"Position calculée à partir de ses éléments moyens : la phase affichée est celle du jour, à quelques degrés près."},
+{id:'phobos',n:'Phobos',t:'Satellite de Mars',p:'mars',R:11.3,m:1.066e16,col:'#8d8378',mo:[9376,.31891,.0151,1.08],s:{k:0,c:['#7d746a','#5a534b','#3b3632'],P:[3,.4,0,1.5],bump:1.4},d:"Orbite Mars en 7 h 39, plus vite que la planète ne tourne."},
+{id:'deimos',n:'Deimos',t:'Satellite de Mars',p:'mars',R:6.2,m:1.48e15,col:'#9a8f82',mo:[23463,1.26244,.0002,1.79],s:{k:0,c:['#9a8f82','#6f665d','#4a443e'],P:[3,.3,0,.8],bump:1}},
+{id:'io',n:'Io',t:'Satellite de Jupiter',p:'jupiter',R:1821.6,m:8.9319e22,col:'#e6d262',mo:[421700,1.769138,.0041,.04],s:{k:0,c:['#dccb5e','#c58a32','#5a3a1e'],P:[3.5,.55,0,.15],bump:.4},d:"Le corps le plus volcanique connu : plus de 400 volcans actifs, entretenus par les marées de Jupiter."},
+{id:'europe',n:'Europe',t:'Satellite de Jupiter',p:'jupiter',R:1560.8,m:4.7998e22,col:'#dcd2bd',mo:[671034,3.551181,.0094,.47],s:{k:4,c:['#ddd3c0','#b39a7c','#8a5a3c'],P:[2.5,.9,0,0],bump:.25},d:"Une croûte de glace striée de fractures, au-dessus d'un océan d'eau liquide."},
+{id:'ganymede',n:'Ganymède',t:'Satellite de Jupiter',p:'jupiter',R:2634.1,m:1.4819e23,col:'#a59d91',mo:[1070412,7.154553,.0013,.2],s:{k:0,c:['#a8a094','#6f675d','#4a443d'],P:[2.2,.8,0,.8],bump:.7},d:"La plus grande lune du système solaire, plus grosse que Mercure."},
+{id:'callisto',n:'Callisto',t:'Satellite de Jupiter',p:'jupiter',R:2410.3,m:1.0759e23,col:'#7c7166',mo:[1882709,16.689018,.0074,.2],s:{k:0,c:['#7a6f63','#4c443c','#2f2a25'],P:[4,.5,0,1.6],bump:1.1}},
+{id:'mimas',n:'Mimas',t:'Satellite de Saturne',p:'saturne',R:198.2,m:3.75e19,col:'#cfcfcf',mo:[185539,.942422,.0196,1.57],s:{k:0,c:['#cfcfcf','#a6a6a6','#7d7d7d'],P:[3,.3,0,1.6],bump:1.2}},
+{id:'encelade',n:'Encelade',t:'Satellite de Saturne',p:'saturne',R:252.1,m:1.08e20,col:'#f4f7fb',mo:[237948,1.370218,.0047,.02],s:{k:4,c:['#f4f7fb','#d5e0ea','#9fc0d8'],P:[3,.7,0,0],bump:.3},d:"L'astre le plus réfléchissant du système solaire ; des geysers d'eau jaillissent de son pôle sud."},
+{id:'tethys',n:'Téthys',t:'Satellite de Saturne',p:'saturne',R:531.1,m:6.17e20,col:'#dedede',mo:[294619,1.887802,.0001,1.12],s:{k:0,c:['#dedede','#b8b8b8','#8c8c8c'],P:[3,.3,0,1.2],bump:.9}},
+{id:'dione',n:'Dioné',t:'Satellite de Saturne',p:'saturne',R:561.4,m:1.095e21,col:'#d0d0d0',mo:[377396,2.736915,.0022,.02],s:{k:0,c:['#d2d2d2','#a8a8a8','#7f7f7f'],P:[3,.4,0,1.1],bump:.9}},
+{id:'rhea',n:'Rhéa',t:'Satellite de Saturne',p:'saturne',R:763.8,m:2.307e21,col:'#cfcbc6',mo:[527108,4.518212,.0013,.35],s:{k:0,c:['#cfcbc6','#a4a09b','#7b7773'],P:[3,.4,0,1.3],bump:1}},
+{id:'titan',n:'Titan',t:'Satellite de Saturne',p:'saturne',R:2574.7,m:1.3452e23,col:'#e0a84a',mo:[1221870,15.945421,.0288,.35],s:{k:3,c:['#dba54a','#c58a34','#a56a26'],P:[1.2,.5,0,0]},atm:['#e7a94e',1.1,.035],d:"La seule lune dotée d'une atmosphère épaisse, avec des lacs de méthane liquide en surface."},
+{id:'japet',n:'Japet',t:'Satellite de Saturne',p:'saturne',R:734.5,m:1.806e21,col:'#b5a998',mo:[3560820,79.3215,.0286,15.47],s:{k:0,c:['#d8d2c6','#6b5a48','#2e2620'],P:[1.4,1,0,1],bump:.9}},
+{id:'miranda',n:'Miranda',t:"Satellite d'Uranus",p:'uranus',R:235.8,m:6.6e19,col:'#c2c2c2',mo:[129390,1.413479,.0013,4.2],s:{k:0,c:['#c2c2c2','#8f8f8f','#666666'],P:[3,.6,0,.8],bump:1.3}},
+{id:'ariel',n:'Ariel',t:"Satellite d'Uranus",p:'uranus',R:578.9,m:1.25e21,col:'#cfcfcf',mo:[191020,2.520379,.0012,.26],s:{k:0,c:['#cfcfcf','#a2a2a2','#777777'],P:[3,.4,0,.8],bump:.9}},
+{id:'umbriel',n:'Umbriel',t:"Satellite d'Uranus",p:'uranus',R:584.7,m:1.28e21,col:'#8a8a8a',mo:[266300,4.144177,.0039,.13],s:{k:0,c:['#8a8a8a','#666666','#474747'],P:[3,.4,0,1.2],bump:.9}},
+{id:'titania',n:'Titania',t:"Satellite d'Uranus",p:'uranus',R:788.4,m:3.4e21,col:'#bdb5ad',mo:[435910,8.705872,.0011,.34],s:{k:0,c:['#bdb5ad','#8f8881','#655f5a'],P:[3,.4,0,1],bump:.9}},
+{id:'oberon',n:'Obéron',t:"Satellite d'Uranus",p:'uranus',R:761.4,m:3.08e21,col:'#a89f97',mo:[583520,13.463239,.0014,.06],s:{k:0,c:['#a89f97','#7d756e','#57514c'],P:[3,.4,0,1.3],bump:.9}},
+{id:'triton',n:'Triton',t:'Satellite de Neptune',p:'neptune',R:1353.4,m:2.14e22,col:'#d4c2b8',mo:[354759,5.876854,.00002,156.9],s:{k:4,c:['#d9c8be','#b89c8e','#7e6a66'],P:[3,.4,0,0],bump:.4},d:"Tourne à l'envers de la rotation de Neptune : probablement un objet de la ceinture de Kuiper capturé."},
+{id:'charon',n:'Charon',t:'Satellite de Pluton',p:'pluton',R:606,m:1.586e21,col:'#9b958f',mo:[19591,6.38723,.0002,0],s:{k:0,c:['#9b958f','#6f6a65','#5a3d36'],P:[2.5,.5,0,1],bump:.9}}
+];
+const LY=9.4607e9,KLY=LY*1000,RS=695700,MS=1.9885e30,RE=6371,ME=5.9724e24,RJ=69911,MJ=1.8982e27;
+function bbcol(T){const t=T/100;return[t<=66?1:Math.min(1,1.292936*Math.pow(t-60,-.1332047)),t<=66?Math.max(0,.3900816*Math.log(t)-.6318414):Math.min(1,1.1298909*Math.pow(t-60,-.0755148)),t>=66?1:t<=19?0:Math.max(0,.5432068*Math.log(t-10)-1.1962541)]}
+const BBS=bbcol(5772);
+B.forEach(b=>{b.cat='sol'});B[0].tint=[1,1,1];B[0].T=5772;B[0].Rs=1;
+// Étoiles : [id, nom, type, AD°, Déc°, distance (al), rayon (R☉), température (K), masse (M☉), texte]
+[['proxima','Proxima du Centaure','Naine rouge M5.5',217.429,-62.679,4.2465,.154,3040,.1221,"L'étoile la plus proche du Soleil. Elle possède au moins une planète dans sa zone habitable."],
+['alfcena','Alpha du Centaure A','Naine jaune G2V',219.902,-60.834,4.344,1.2175,5790,1.079,"Presque une jumelle du Soleil. Avec sa compagne B, elle forme la troisième étoile la plus brillante du ciel."],
+['alfcenb','Alpha du Centaure B','Naine orange K1V',219.902,-60.834,4.344,.8591,5260,.909,"Tourne autour de A en 79,8 ans, à une distance qui varie de 11 à 35 UA. Sa position sur cette orbite est ici indicative."],
+['barnard',"Étoile de Barnard",'Naine rouge M4',269.452,4.693,5.963,.187,3200,.144,"L'étoile au mouvement propre le plus rapide du ciel : 10,4 secondes d'arc par an."],
+['sirius','Sirius','Étoile blanche A1V',101.287,-16.716,8.60,1.711,9940,2.063,"L'étoile la plus brillante du ciel nocturne."],
+['epseri','Epsilon Eridani','Naine orange K2V',53.233,-9.458,10.47,.735,5080,.82,"Une étoile jeune, entourée d'un disque de débris et d'au moins une planète géante."],
+['procyon','Procyon','Sous-géante F5',114.825,5.225,11.46,2.048,6530,1.499],
+['tauceti','Tau Ceti','Naine jaune G8V',26.017,-15.937,11.91,.793,5340,.783],
+['vega','Véga','Étoile blanche A0V',279.235,38.784,25.04,2.6,9600,2.135,"Étalon historique des magnitudes. Elle tourne si vite sur elle-même qu'elle est nettement aplatie."],
+['arcturus','Arcturus','Géante rouge K1.5',213.915,19.182,36.7,25.4,4290,1.08],
+['trappist1','TRAPPIST-1','Naine rouge ultra-froide M8',346.622,-5.041,40.66,.1192,2566,.0898,"Sept planètes de taille terrestre, toutes plus proches de leur étoile que Mercure du Soleil. Le système entier tiendrait dans l'orbite de Mercure."],
+['51peg','51 Pegasi','Naine jaune G2IV',344.367,20.769,50.6,1.237,5790,1.11,"En 1995, Michel Mayor et Didier Queloz y découvrent la première exoplanète autour d'une étoile semblable au Soleil."],
+['aldebaran','Aldébaran','Géante rouge K5',68.980,16.509,65.3,45.1,3900,1.16],
+['canopus','Canopus','Géante brillante A9',95.988,-52.696,310,71,7400,8],
+['polaris','Étoile polaire','Supergéante jaune F7',37.954,89.264,433,37.5,6015,5.4],
+['betelgeuse','Bételgeuse','Supergéante rouge M1',88.793,7.407,548,764,3600,16.5,"Placée au centre du système solaire, elle engloberait l'orbite de Mars. Elle finira en supernova."],
+['antares','Antarès','Supergéante rouge M1.5',247.352,-26.432,550,680,3660,13],
+['rigel','Rigel','Supergéante bleue B8',78.634,-8.202,860,78.9,12100,21],
+['deneb','Deneb','Supergéante blanche A2',310.358,45.280,2615,203,8525,19,"L'une des étoiles les plus lumineuses connues : visible à l'œil nu à plus de 2 600 années-lumière."]
+].forEach(a=>{const c=bbcol(a[7]),t=c.map((v,i)=>Math.pow(v/BBS[i],2));
+ B.push({id:a[0],n:a[1],t:a[2],fx:[a[3],a[4],a[5]],R:a[6]*RS,Rs:a[6],T:a[7],m:a[8]*MS,ms:a[8],d:a[9],kind:'sun',cat:'star',W:[0,14],tint:t,col:'rgb('+c.map(v=>Math.round(v*255)).join(',')+')'})});
+// Exoplanètes : [id, nom, étoile, a (UA), période (j), rayon (km), masse (kg), surface]
+[['prxb','Proxima b','proxima',.04856,11.1868,1.07*RE,1.07*ME,{k:0,c:['#8a5a44','#5a3a30','#2e2422'],P:[2.5,.7,0,.4],bump:.7}],
+['tr1b','TRAPPIST-1 b','trappist1',.01154,1.510826,1.116*RE,1.374*ME,{k:0,c:['#6e5a52','#463a36','#2a2422'],P:[3,.5,0,.8],bump:.9}],
+['tr1c','TRAPPIST-1 c','trappist1',.0158,2.421937,1.097*RE,1.308*ME,{k:0,c:['#8a6a4e','#5c4636','#33282a'],P:[2.6,.6,0,.6],bump:.8}],
+['tr1d','TRAPPIST-1 d','trappist1',.02227,4.049219,.788*RE,.388*ME,{k:3,c:['#c9b48f','#9a7f5e','#6e5a48'],P:[2,1.1,0,0]}],
+['tr1e','TRAPPIST-1 e','trappist1',.02925,6.101013,.92*RE,.692*ME,{k:0,c:['#3f6a8c','#7a6a52','#2a3f55'],P:[1.8,.9,.9,.2],bump:.5}],
+['tr1f','TRAPPIST-1 f','trappist1',.03849,9.20754,1.045*RE,1.039*ME,{k:4,c:['#cfe0e8','#8fb2c8','#6a8fb0'],P:[2.5,.6,0,0],bump:.3}],
+['tr1g','TRAPPIST-1 g','trappist1',.04683,12.352446,1.129*RE,1.321*ME,{k:4,c:['#e2e8ee','#a9bccb','#7f97ad'],P:[2.2,.5,0,0],bump:.3}],
+['tr1h','TRAPPIST-1 h','trappist1',.06189,18.772866,.755*RE,.326*ME,{k:4,c:['#eef2f6','#c2ccd6','#98a6b6'],P:[3,.4,0,0],bump:.35}],
+['51pegb','51 Pegasi b','51peg',.0527,4.2308,1.27*RJ,.46*MJ,{k:1,c:['#6a7fb8','#3f4f8f','#2c3466','#93a6d8'],P:[9,1.2,.7,0]}],
+['epserib','Epsilon Eridani b','epseri',3.53,2690,1.0*RJ,.66*MJ,{k:1,c:['#e6d9c2','#b79a78','#8a6a4c','#f2ead9'],P:[12,1.1,.7,0]}]
+].forEach(a=>{B.push({id:a[0],n:a[1],t:'Exoplanète',p:a[2],R:a[5],m:a[6],mo:[a[3]*149597870.7,a[4],0,0],s:a[7],cat:'star',exo:1,col:a[7].c[0]})});
+// Nébuleuses et galaxies : [id, nom, type, catégorie, AD°, Déc°, distance (al), largeur du cadre (al), image, largeur/hauteur, texte, crédit]
+[['aigle',"Nébuleuse de l'Aigle",'Nébuleuse en émission · M16','neb',274.7,-13.807,5700,75,'aigle',1,"Une pouponnière d'étoiles. Les Piliers de la Création se dressent en son centre : zoomez pour les faire apparaître.",'ESO'],
+['piliers','Piliers de la Création','Colonnes de gaz et de poussière · M16','neb',274.7,-13.807,5699,5.6,'piliers',.959,"Trois colonnes de gaz froid sculptées par le rayonnement d'étoiles jeunes. La plus haute mesure environ 4 années-lumière. Image Hubble de 2014, en lumière visible.",'NASA, ESA, Hubble Heritage Team (STScI/AURA)'],
+['crabe','Nébuleuse du Crabe','Reste de supernova · M1','neb',83.633,22.014,6500,12.5,'crabe',1,"Le reste d'une étoile dont l'explosion fut observée en 1054. Au centre, un pulsar tourne 30 fois par seconde. Les filaments s'étendent à 1 500 km/s.",'NASA, ESA, J. Hester et A. Loll (Arizona State University)'],
+['orion',"Grande nébuleuse d'Orion",'Nébuleuse en émission · M42','neb',83.822,-5.391,1344,30,'orion',1,"La région de formation d'étoiles massives la plus proche. Visible à l'œil nu sous le Baudrier d'Orion.",'NASA, ESA, M. Robberto (STScI/ESA)'],
+['anneau',"Nébuleuse de l'Anneau",'Nébuleuse planétaire · M57','neb',283.396,33.029,2570,2.6,'anneau',1,"Les couches externes d'une étoile semblable au Soleil, expulsées en fin de vie. La naine blanche centrale chauffe encore le gaz à 120 000 °C.",'NASA, ESA, C. R. O\'Dell (Vanderbilt University)'],
+['lagune','Nébuleuse de la Lagune','Nébuleuse en émission · M8','neb',270.904,-24.387,4100,120,'lagune',1.463,"Un nuage géant de 110 années-lumière de long, dans la direction du centre galactique.",'ESO'],
+['trifide','Nébuleuse Trifide','Nébuleuse en émission et par réflexion · M20','neb',270.675,-22.972,4100,45,'trifide',1.048,"Rose là où le gaz émet, bleue là où la poussière réfléchit la lumière, et coupée en trois par des bandes sombres.",'ESO'],
+['omega','Nébuleuse Oméga','Nébuleuse en émission · M17','neb',275.196,-16.172,5500,55,'omega',1.778,"L'une des régions de formation d'étoiles les plus brillantes et massives de la Voie lactée.",'ESO'],
+['haltere',"Nébuleuse de l'Haltère",'Nébuleuse planétaire · M27','neb',299.901,22.721,1360,3.6,'haltere',.992,"La première nébuleuse planétaire découverte, par Charles Messier en 1764.",'ESO'],
+['voielactee','Voie lactée','Galaxie spirale barrée','gal',266.405,-28.936,26700,110000,null,1,"Notre galaxie : 100 à 400 milliards d'étoiles dans un disque d'environ 100 000 années-lumière. Le Soleil se trouve à 26 700 années-lumière du centre et en fait le tour en 230 millions d'années. La forme des bras est ici un modèle : personne n'a jamais vu la Voie lactée de l'extérieur.",null],
+['andromede',"Galaxie d'Andromède",'Galaxie spirale · M31','gal',10.685,41.269,2.537e6,200000,'andromede',1.522,"La grande galaxie la plus proche, et l'objet le plus lointain visible à l'œil nu. Elle se rapproche de la Voie lactée à 110 km/s.",'observatoire au sol'],
+['triangle','Galaxie du Triangle','Galaxie spirale · M33','gal',23.462,30.66,2.73e6,75000,'triangle',1,"Troisième plus grande galaxie du Groupe local, après Andromède et la Voie lactée.",'ESO'],
+['tourbillon','Galaxie du Tourbillon','Galaxie spirale en interaction · M51','gal',202.47,47.195,2.7e7,120000,'tourbillon',1.441,"Ses bras spiraux sont renforcés par le passage de sa petite compagne, NGC 5195.",'NASA, ESA, S. Beckwith (STScI), Hubble Heritage Team'],
+['sombrero','Galaxie du Sombrero','Galaxie spirale vue par la tranche · M104','gal',189.998,-11.623,3.1e7,95000,'sombrero',1.785,"Un bulbe énorme et un anneau de poussière vu presque par la tranche.",'NASA, Hubble Heritage Team (STScI/AURA)']
+].forEach(a=>{B.push({id:a[0],n:a[1],t:a[2],cat:a[3],fx:[a[4],a[5],a[6]],R:a[7]*LY*500,szly:a[7],img:a[8],asp:a[9],d:a[10],cred:a[11],flat:1,col:a[3]==='neb'?'#e58fb0':'#b9c6ff'})});
+B.push({id:'m87gal',n:'Galaxie M87',t:'Galaxie elliptique géante · M87',cat:'gal',fx:[187.706,12.391,5.35e7],R:22000*LY*500,szly:22000,img:'m87',asp:1,flat:1,col:'#b9c6ff',cred:'NASA, ESA, Hubble Heritage Team (STScI/AURA)',d:"Le cœur d'une galaxie de plusieurs milliers de milliards d'étoiles. Le trait bleu est un jet de matière de 5 000 années-lumière, lancé par le trou noir central M87*."});
+// Trous noirs : rayon = rayon de Schwarzschild 2GM/c² (2,953 km par masse solaire)
+[['sgra','Sagittarius A*','Trou noir supermassif',[266.405,-28.936,26700],4.3e6,[.35,.85,.4],[3,11],[1,.55,.3],.75,null,"Le trou noir au centre de la Voie lactée, 4,3 millions de fois la masse du Soleil. Les étoiles voisines tournent autour de lui à plusieurs milliers de km/s."],
+['cygx1','Cygnus X-1','Trou noir stellaire',[299.59,35.202,7200],21.2,[.2,.95,.25],[3,13],[.75,.85,1],1.3,null,"Le premier trou noir identifié, en 1971. Il arrache la matière de son étoile compagne, une supergéante bleue visible juste à côté."],
+['m87s','M87*','Trou noir supermassif',[187.706,12.391,5.35e7],6.5e9,[.55,.6,.58],[3,12],[1,.6,.25],1,{len:5000*LY,w:.022,col:[.55,.7,1],I:.8,one:1},"6,5 milliards de masses solaires. C'est le premier trou noir dont l'ombre a été photographiée, en 2019, par l'Event Horizon Telescope."],
+['q3c273','Quasar 3C 273','Quasar · trou noir supermassif actif',[187.278,2.052,2.44e9],8.86e8,[.3,.9,.3],[3,14],[.85,.9,1],1.7,{len:2e5*LY,w:.02,col:[.6,.75,1],I:.7,one:1},"Le premier quasar identifié, en 1963, et l'un des plus proches. Son disque d'accrétion brille comme 4 000 milliards de soleils : plus que toutes les étoiles de sa galaxie réunies."]
+].forEach(a=>{const ax=new THREE.Vector3().fromArray(a[5]).normalize();
+ B.push({id:a[0],n:a[1],t:a[2],cat:'ext',kind:'bh',fx:a[3],ms:a[4],m:a[4]*MS,R:a[4]*2.95325,axis:ax,disc:a[6],tint:a[7],gain:a[8],jet:a[9],d:a[10],col:'#ffb070'})});
+B.push({id:'hde226868',n:'HDE 226868',t:'Supergéante bleue O9.7 · compagne de Cygnus X-1',fx:[299.59,35.202,7200],off:[2.75e4,2e3,1.1e4],R:20*RS,Rs:20,T:31000,m:40*MS,ms:40,kind:'sun',cat:'ext',W:[0,14],tint:bbcol(31000).map((v,i)=>Math.pow(v/BBS[i],2)),col:'#aac8ff',d:"L'étoile que Cygnus X-1 dévore lentement. Les deux astres tournent l'un autour de l'autre en 5,6 jours, séparés de 0,2 UA ; la position sur l'orbite est ici figée."});
+// Étoiles à neutrons : [id, nom, type, position, période réelle (s), période affichée (s), champ magnétique, longueur des faisceaux (km), texte]
+[['crabp','Pulsar du Crabe','Pulsar · étoile à neutrons',[83.633,22.014,6500],.0334,1.6,'10⁸ teslas',9000,"Le cœur effondré de la supernova de 1054 : 1,4 masse solaire dans une sphère de 20 km. Il tourne 30 fois par seconde et alimente toute la nébuleuse du Crabe."],
+['b1919','PSR B1919+21','Pulsar · étoile à neutrons',[290.437,21.884,1000],1.3373,1.3373,'10⁸ teslas',9000,"Le premier pulsar découvert, par Jocelyn Bell en 1967. Son signal était si régulier qu'il fut surnommé LGM-1, pour « petits hommes verts ». Sa distance est mal connue."],
+['sgr1806','SGR 1806-20','Magnétar · étoile à neutrons',[272.164,-20.411,28000],7.55,7.55,'10¹¹ teslas',14000,"Le champ magnétique le plus intense connu. Le 27 décembre 2004, un séisme à sa surface a libéré en 0,2 seconde l'énergie que le Soleil émet en 250 000 ans. Sa distance est mal connue."]
+].forEach(a=>{const T=a[0]==='sgr1806'?45000:1e6;
+ B.push({id:a[0],n:a[1],t:a[2],fx:a[3],R:10,Rs:10/RS,T:T,m:1.4*MS,ms:1.4,kind:'sun',cat:'ext',W:[0,14],ns:{P:a[4],Pv:a[5],B:a[6]},jet:{len:a[7]/1000,w:.09,col:a[0]==='sgr1806'?[1,.6,.9]:[.6,.8,1],I:1.3},axis:new THREE.Vector3(.25,.9,.35).normalize(),tint:bbcol(T).map((v,i)=>Math.pow(v/BBS[i],2)),col:a[0]==='sgr1806'?'#ffa8e0':'#a8d0ff',d:a[8]})});
+// Engins spatiaux. R = demi-envergure (km). Orbites terrestres : [demi-grand axe km, période j, excentricité, inclinaison °].
+const CRAFT_NOTE={orb:"Altitude, inclinaison et période réelles ; la position le long de l'orbite est indicative. Maquette simplifiée.",
+ far:"Distance et direction approchées (trajectoire rectiligne à vitesse constante), valables autour de la date actuelle. Maquette simplifiée.",
+ l2:"Placé au point de Lagrange L2 ; son orbite de halo autour de ce point n'est pas représentée. Maquette simplifiée."};
+[['iss','ISS','Station spatiale internationale','iss',.0545,'orb',{p:'terre',mo:[6791,.064463,.0005,51.64]},[['Premier module','20 novembre 1998'],['Masse','environ 420 tonnes'],['Dimensions','109 × 73 m'],['Altitude','environ 420 km'],['Tour de la Terre','92,8 min'],['Équipage habituel','7 personnes']],
+  "Le plus grand objet jamais assemblé dans l'espace, habité sans interruption depuis novembre 2000. Elle fait le tour de la Terre 15,5 fois par jour."],
+ ['hubble','Hubble','Télescope spatial','hst',.0066,'orb',{p:'terre',mo:[6901,.06604,.0003,28.47]},[['Lancement','24 avril 1990'],['Masse','11 tonnes'],['Longueur','13,2 m'],['Miroir','2,4 m'],['Altitude','environ 530 km'],['Tour de la Terre','95 min']],
+  "Plus de trente ans d'observations en lumière visible et ultraviolette. Les images des Piliers de la Création et de la nébuleuse du Crabe affichées ici viennent de lui."],
+ ['jwst','James Webb','Télescope spatial infrarouge','jwst',.0106,'l2',{l2:1,aimId:'soleil',ancId:'terre'},[['Lancement','25 décembre 2021'],['Masse','6,2 tonnes'],['Miroir','6,5 m, 18 segments en béryllium doré'],['Bouclier thermique','21 × 14 m'],['Position','point L2, à 1,5 million de km']],
+  "Il observe dans l'infrarouge, dos au Soleil. Son bouclier à cinq couches maintient le miroir à −233 °C."],
+ ['voyager1','Voyager 1','Sonde interstellaire','voy',.0075,'far',{far:[258.3,12.1,165.9,3.57],aimId:'terre',ancId:'soleil'},[['Lancement','5 septembre 1977'],['Masse','722 kg'],['Antenne','3,7 m'],['Espace interstellaire','depuis août 2012']],
+  "L'objet humain le plus lointain. Elle a survolé Jupiter et Saturne, puis quitté l'héliosphère en 2012. Elle emporte un disque d'or avec des sons et des images de la Terre."],
+ ['voyager2','Voyager 2','Sonde interstellaire','voy',.0075,'far',{far:[302,-59.2,139.2,3.23],aimId:'terre',ancId:'soleil'},[['Lancement','20 août 1977'],['Masse','722 kg'],['Antenne','3,7 m'],['Espace interstellaire','depuis novembre 2018']],
+  "La seule sonde à avoir survolé Uranus (1986) et Neptune (1989). Presque tout ce que l'on sait de près sur ces deux planètes vient d'elle."],
+ ['newhorizons','New Horizons','Sonde','nh',.0015,'far',{far:[291,-20.3,60.5,2.9],aimId:'terre',ancId:'soleil'},[['Lancement','19 janvier 2006'],['Masse','478 kg'],['Survol de Pluton','14 juillet 2015'],["Survol d'Arrokoth",'1er janvier 2019']],
+  "Elle a révélé Pluton en 2015 après neuf ans de voyage, puis Arrokoth, l'objet le plus lointain jamais survolé."]
+].forEach(a=>{const b=Object.assign({id:a[0],n:a[1],t:a[2],craft:a[3],R:a[4],nk:a[5],rows:a[7],d:a[8],cat:'craft',col:'#9fe0c8'},a[6]);
+ if(b.far){const f=b.far,v=eq2three(f[0],f[1]);b.dyn=(d,o)=>{const r=Math.max(1,f[2]+f[3]*(d-9131.5)/365.25)*AU;o[0]=v.x*r;o[1]=v.y*r;o[2]=v.z*r;return o}}
+ if(b.l2)b.dyn=(d,o)=>{bodyPos(EARTH,d,o);const k=1+1500/Math.hypot(o[0],o[1],o[2]);o[0]*=k;o[1]*=k;o[2]*=k;return o};
+ B.push(b)});
+const byId={};B.forEach((b,i)=>{byId[b.id]=b;b.i=i;b.pos=[0,0,0];b.rel=new THREE.Vector3();b.kids=[]});
+B.forEach(b=>{if(b.p){b.par=byId[b.p];b.par.kids.push(b)}});
+B.forEach(b=>{b.sys=b.mo?b.par:b;b.star=b.kind==='sun'?b:b.par?b.par.star:null});
+const SUN=byId.soleil, EARTH=byId.terre, MOON=byId.lune;
+
+/* ============ mécanique céleste ============ */
+function kepler(M,e){let E=M+e*Math.sin(M);for(let k=0;k<7;k++)E-=(E-e*Math.sin(E)-M)/(1-e*Math.cos(E));return E}
+// Éléments -> position (repère scène : x = point vernal, y = pôle nord écliptique), unités de a.
+function orb(a,e,i,Om,w,M,out){const E=kepler(M,e),xp=a*(Math.cos(E)-e),yp=a*Math.sqrt(1-e*e)*Math.sin(E),
+  cw=Math.cos(w),sw=Math.sin(w),cO=Math.cos(Om),sO=Math.sin(Om),ci=Math.cos(i),si=Math.sin(i);
+  const x=(cw*cO-sw*sO*ci)*xp+(-sw*cO-cw*sO*ci)*yp, y=(cw*sO+sw*cO*ci)*xp+(-sw*sO+cw*cO*ci)*yp, z=sw*si*xp+cw*si*yp;
+  out[0]=x;out[1]=z;out[2]=-y;return out}
+function planetEl(b,d){const T=d/36525,e=b.el;return[e[0]+e[6]*T,e[1]+e[7]*T,(e[2]+e[8]*T)*D2R,(e[3]+e[9]*T)*D2R,(e[4]+e[10]*T)*D2R,(e[5]+e[11]*T)*D2R]}
+function planetPos(b,d,out,Mover){const q=planetEl(b,d);const M=Mover===undefined?q[3]-q[4]:Mover;orb(q[0]*AU,q[1],q[2],q[5],q[4]-q[5],M,out);return out}
+function lunaEl(d){return[384.4,.0549,5.145*D2R,(125.08-.0529538083*d)*D2R,(318.15+.1643573223*d)*D2R,(115.3654+13.0649929509*d)*D2R]}
+const tmpA=[0,0,0];
+function moonRel(b,d,out,Mover){ // position relative à la planète
+  if(b===MOON){const q=lunaEl(d);return orb(q[0],q[1],q[2],q[3],q[4],Mover===undefined?q[5]:Mover,out)}
+  const m=b.mo,a=m[0]/1000,e=m[2],inc=m[3]*D2R,M=Mover===undefined?b.M0+TAU*d/m[1]:Mover;
+  const E=kepler(M,e),xp=a*(Math.cos(E)-e),yp=a*Math.sqrt(1-e*e)*Math.sin(E),u=b.fu,v=b.fv,P=b.par.poleV,ci=Math.cos(inc),si=Math.sin(inc);
+  out[0]=u.x*xp+(v.x*ci+P.x*si)*yp;out[1]=u.y*xp+(v.y*ci+P.y*si)*yp;out[2]=u.z*xp+(v.z*ci+P.z*si)*yp;return out}
+const MOON_FRAC=7.342e22/(5.9724e24+7.342e22);
+function bodyPos(b,d,out){
+  if(b===SUN){out[0]=out[1]=out[2]=0;return out}
+  if(b.fp){out[0]=b.fp[0];out[1]=b.fp[1];out[2]=b.fp[2];return out}
+  if(b.dyn)return b.dyn(d,out);
+  if(b.mo){bodyPos(b.par,d,out);const r=moonRel(b,d,[0,0,0]);out[0]+=r[0];out[1]+=r[1];out[2]+=r[2];return out}
+  planetPos(b,d,out);
+  if(b===EARTH){const r=moonRel(MOON,d,tmpA);out[0]-=r[0]*MOON_FRAC;out[1]-=r[1]*MOON_FRAC;out[2]-=r[2]*MOON_FRAC}
+  return out}
+// Orientation : pôle (AD/Déc J2000, UAI) et méridien origine W = W0 + Ẇ·d.
+const ZEQ=eq2three(0,90);
+B.forEach((b,k)=>{
+  if(b.pole){b.poleV=eq2three(b.pole[0],b.pole[1]);b.nodeV=eq2three(b.pole[0]+90,0)}
+  else if(b.par)b.poleV=b.par.poleV;else{b.poleV=new THREE.Vector3(0,1,0);b.nodeV=new THREE.Vector3(1,0,0)}
+  if(b.craft){b.star=SUN;if(b.aimId)b.aim=byId[b.aimId];if(b.ancId)b.anc=byId[b.ancId]}
+  if(b.fx){const v=eq2three(b.fx[0],b.fx[1]).multiplyScalar(b.fx[2]*LY);b.fp=[v.x,v.y,v.z];if(b.id==='alfcenb'){b.fp[0]+=3.1e6;b.fp[2]+=1.5e6}if(b.off){b.fp[0]+=b.off[0];b.fp[1]+=b.off[1];b.fp[2]+=b.off[2]}b.inMW=b.fx[2]<2e5}
+});
+B.forEach((b,k)=>{ if(b.mo&&b!==MOON){const P=b.par.poleV;b.fu=new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0),P);if(b.fu.lengthSq()<1e-6)b.fu.set(1,0,0);b.fu.normalize();b.fv=new THREE.Vector3().crossVectors(P,b.fu);b.M0=(k*2.399963)%TAU} });
+const mX=new THREE.Vector3(),mY=new THREE.Vector3(),mZ=new THREE.Vector3(),mM=new THREE.Matrix4();
+function bodyQuat(b,d,q){
+  const tg=b.mo?b.par:b.aim;
+  if(tg){ // rotation synchrone : l'axe X pointe vers la planète (lunes) ou vers la cible (antennes, bouclier)
+    mX.set(tg.pos[0]-b.pos[0],tg.pos[1]-b.pos[1],tg.pos[2]-b.pos[2]).normalize();
+    mY.copy(b===MOON?ZECL:b.poleV);if(b.mo&&b.mo[3]>90)mY.negate();mY.addScaledVector(mX,-mY.dot(mX)).normalize();
+  }else{const W=((b.W[0]+b.W[1]*d)%360)*D2R;mY.copy(b.poleV);mZ.crossVectors(mY,b.nodeV);
+    mX.copy(b.nodeV).multiplyScalar(Math.cos(W)).addScaledVector(mZ,Math.sin(W));}
+  mZ.crossVectors(mX,mY);mM.makeBasis(mX,mY,mZ);return q.setFromRotationMatrix(mM)}
+const ZECL=new THREE.Vector3(0,1,0);
+
+/* ============ rendu ============ */
+const canvas=document.getElementById('gl');
+let renderer;
+try{renderer=new THREE.WebGLRenderer({canvas,antialias:false,logarithmicDepthBuffer:true,powerPreference:'high-performance'})}
+catch(e){document.getElementById('load').textContent="WEBGL INDISPONIBLE SUR CET APPAREIL";return}
+const DPR=Math.min(Math.max(window.devicePixelRatio||1,1.25),2);
+renderer.setPixelRatio(DPR);
+const scene=new THREE.Scene(), camera=new THREE.PerspectiveCamera(40,1,1e-3,1e11);
+const gl=renderer.getContext();
+const hdr=renderer.capabilities.isWebGL2&&(renderer.extensions.get('EXT_color_buffer_float')||renderer.extensions.get('EXT_color_buffer_half_float'));
+const rt=new THREE.WebGLRenderTarget(4,4,{type:hdr?THREE.HalfFloatType:THREE.UnsignedByteType,minFilter:THREE.LinearFilter,magFilter:THREE.LinearFilter,format:THREE.RGBAFormat});
+const composer=new THREE.EffectComposer(renderer,rt);
+composer.addPass(new THREE.RenderPass(scene,camera));
+const bloom=new THREE.UnrealBloomPass(new THREE.Vector2(256,256),.6,.5,.95);composer.addPass(bloom);
+if(hdr)[bloom.renderTargetBright].concat(bloom.renderTargetsHorizontal,bloom.renderTargetsVertical).forEach(t=>{t.texture.type=THREE.HalfFloatType});
+const tone=new THREE.ShaderPass({uniforms:{tDiffuse:{value:null},uExp:{value:1}},
+ vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+ fragmentShader:`uniform sampler2D tDiffuse;uniform float uExp;varying vec2 vUv;
+ vec3 aces(vec3 x){return clamp((x*(2.51*x+.03))/(x*(2.43*x+.59)+.14),0.,1.);}
+ void main(){vec3 c=texture2D(tDiffuse,vUv).rgb*uExp;vec2 q=vUv-.5;c*=1.-dot(q,q)*.55;c=pow(aces(c),vec3(1./2.2));
+ c+=(fract(sin(dot(gl_FragCoord.xy,vec2(12.9898,78.233)))*43758.5453)-.5)/255.;gl_FragColor=vec4(c,1.);}`});
+composer.addPass(tone);
+
+const NOISE=`
+float h3(vec3 p){p=fract(p*.3183099+.1);p*=17.;return fract(p.x*p.y*p.z*(p.x+p.y+p.z));}
+float vnoise(vec3 x){vec3 i=floor(x),f=fract(x);f=f*f*(3.-2.*f);
+ return mix(mix(mix(h3(i),h3(i+vec3(1,0,0)),f.x),mix(h3(i+vec3(0,1,0)),h3(i+vec3(1,1,0)),f.x),f.y),
+            mix(mix(h3(i+vec3(0,0,1)),h3(i+vec3(1,0,1)),f.x),mix(h3(i+vec3(0,1,1)),h3(i+vec3(1,1,1)),f.x),f.y),f.z);}
+float fbm(vec3 p){float a=.5,s=0.;for(int i=0;i<5;i++){s+=a*vnoise(p);p=p*2.03+vec3(11.3,7.1,3.7);a*=.5;}return s;}
+float fbm3(vec3 p){float a=.5,s=0.;for(int i=0;i<3;i++){s+=a*vnoise(p);p=p*2.03+vec3(11.3,7.1,3.7);a*=.5;}return s;}
+`;
+// Profil radial des anneaux (r en milliers de km) : D, C, B, division de Cassini, A, lacune d'Encke, F.
+const RING=`
+uniform vec4 uRing;
+float ringD(float r){
+ if(uRing.w<.5)return 0.;
+ if(uRing.w<1.5){
+  float d=.05*smoothstep(66.9,68.,r)*smoothstep(74.6,74.4,r);
+  d+=(.10+.12*smoothstep(74.6,92.,r))*smoothstep(74.55,74.75,r)*smoothstep(92.05,91.95,r);
+  d+=(.72+.22*smoothstep(92.,106.,r))*smoothstep(91.95,92.15,r)*smoothstep(117.62,117.5,r);
+  d+=.07*smoothstep(117.55,117.7,r)*smoothstep(122.2,122.1,r);
+  d+=(.56-.14*smoothstep(122.,136.,r))*smoothstep(122.1,122.3,r)*smoothstep(136.8,136.7,r);
+  d*=1.-smoothstep(.3,.12,abs(r-133.59));
+  d+=.22*smoothstep(.15,0.,abs(r-140.2));
+  float f=.8+.2*sin(r*9.1)*sin(r*2.3+1.)+.3*(vnoise(vec3(r*5.,0.,0.))-.5)+.3*(vnoise(vec3(r*23.,3.,0.))-.5);
+  return clamp(d*f,0.,1.);
+ }
+ float w=.06+uRing.z, d=0.;
+ d+=smoothstep(w,0.,abs(r-41.84))+smoothstep(w,0.,abs(r-42.23))+smoothstep(w,0.,abs(r-42.57))+smoothstep(w,0.,abs(r-44.72))+smoothstep(w,0.,abs(r-45.66));
+ d+=smoothstep(w,0.,abs(r-47.18))+smoothstep(w,0.,abs(r-47.63))+smoothstep(w,0.,abs(r-48.3))+2.5*smoothstep(w*1.6,0.,abs(r-51.15));
+ return clamp(d*.06/w,0.,1.);
+}`;
+const VERT=`
+#include <common>
+#include <logdepthbuf_pars_vertex>
+varying vec3 vObj,vW;varying vec2 vUv;
+void main(){vObj=position;vUv=uv;vec4 wp=modelMatrix*vec4(position,1.);vW=wp.xyz;gl_Position=projectionMatrix*viewMatrix*wp;
+#include <logdepthbuf_vertex>
+}`;
+const PLANET_F=`
+#include <common>
+#include <logdepthbuf_pars_fragment>
+uniform int uKind;uniform vec3 uSun,uC1,uC2,uC3,uC4,uAtm,uBody,uPole;uniform vec4 uP;uniform vec4 uOcc[4];
+uniform float uSunAng,uSeed,uAtmK,uClock,uBump,uPx;uniform mat3 uRot;
+uniform sampler2D tDay,tNight,tWater,tCloud;
+varying vec3 vObj,vW;varying vec2 vUv;
+${NOISE}${RING}
+float crat(vec3 p){vec3 i=floor(p),f=fract(p);vec3 c=.35+.3*vec3(h3(i),h3(i+7.1),h3(i+13.7));float r=.1+.22*h3(i+3.3);float d=length(f-c)/r;
+ return (d<1.?-.7*(1.-d*d):0.)+.35*exp(-(d-1.)*(d-1.)*30.);}
+float height(vec3 p){float h=fbm3(p*2.5+uSeed)*.9;float k=uP.w;
+ if(k>0.)h+=k*(crat(p*3.1+uSeed)*.5+crat(p*7.3+uSeed*2.)*.3+crat(p*16.7+uSeed*3.)*.13+crat(p*37.+uSeed*5.)*.05);return h;}
+float shadow(vec3 p){float s=1.;
+ for(int i=0;i<4;i++){vec4 o=uOcc[i];if(o.w>0.){vec3 d=o.xyz-p;float t=dot(d,uSun);if(t>0.){float h=length(d-uSun*t);float pen=t*uSunAng+o.w*.015;s*=smoothstep(o.w-pen,o.w+pen,h);}}}
+ if(uRing.w>.5){float dn=dot(uSun,uPole);float t=-dot(p,uPole)/dn;if(t>0.){s*=1.-.85*ringD(length(p+uSun*t));}}
+ return s;}
+void main(){
+#include <logdepthbuf_fragment>
+ vec3 no=normalize(vObj);vec3 V=normalize(-vW);vec3 col;float spec=0.;vec3 emis=vec3(0.);float soft=.0;
+ vec3 nb=no;
+ if(uKind==0||uKind==4){
+  if(uPx>60.&&uBump>0.){float e=.003;float h0=height(no);vec3 g=vec3(height(no+vec3(e,0,0)),height(no+vec3(0,e,0)),height(no+vec3(0,0,e)))-h0;g/=e;g-=no*dot(g,no);nb=normalize(no-g*uBump*.035);}
+ }
+ vec3 N=normalize(uRot*nb);vec3 Ns=normalize(uRot*no);
+ float ndl=dot(N,uSun),ndls=dot(Ns,uSun),ndv=max(dot(Ns,V),0.);
+ if(uKind==0){
+  float a=fbm(no*uP.x+uSeed);float m=fbm3(no*1.25+uSeed*1.7);
+  col=mix(uC1,uC2,smoothstep(.32,.68,a));col=mix(col,uC3,smoothstep(.5,.66,m)*uP.y);
+  col*=.8+.45*height(no);
+  if(uP.z>0.){float cap=smoothstep(uP.z,uP.z+.035,abs(no.y)+(fbm3(no*7.)-.5)*.09);col=mix(col,vec3(.9,.92,.95),cap);}
+ }else if(uKind==1){
+  float lat=no.y;vec3 q=vec3(no.x,no.y*3.,no.z);
+  float turb=fbm(q*3.+vec3(0.,uSeed,0.));
+  float y=lat+(turb-.5)*uP.y*.04+(fbm3(vec3(no.x*7.,lat*34.,no.z*7.)+uSeed)-.5)*.022*uP.y;
+  float b=vnoise(vec3(y*uP.x,uSeed,1.))*.58+vnoise(vec3(y*uP.x*2.7,uSeed,5.))*.3+vnoise(vec3(y*uP.x*7.,3.,uSeed))*.12;
+  float streak=fbm(vec3(no.x*3.,y*70.,no.z*3.)+uSeed);
+  col=mix(uC1,uC2,smoothstep(.36,.6,b)*(.35+.65*uP.z));col=mix(col,uC3,smoothstep(.58,.76,b)*uP.z);col=mix(col,uC4,smoothstep(.4,.22,b)*uP.z*.8);
+  col*=.86+.28*streak*(.4+.6*uP.z);
+  if(uP.w>.5){float la=asin(lat),lo=atan(no.z,no.x);vec2 e=vec2(sin(lo-1.2)*cos(la)/.2,(la+.384)/.085);float r=length(e);
+   float sw=fbm3(vec3(e*2.5+vec2(sin(r*4.),cos(r*4.)),3.));col=mix(col,vec3(.56,.19,.09)*(.75+.5*sw),smoothstep(1.,.55,r)*.9);}
+  col*=mix(1.,.72,smoothstep(.62,1.,abs(lat)));soft=.35;
+ }else if(uKind==2){
+  vec3 day=pow(texture2D(tDay,vUv).rgb,vec3(2.2));float w=texture2D(tWater,vUv).r;
+  float cl=texture2D(tCloud,vUv+vec2(uClock*.00012,0.)).r;cl=smoothstep(.05,.9,cl);
+  vec3 H=normalize(uSun+V);spec=pow(max(dot(Ns,H),0.),320.)*w*(1.-cl)*.3;
+  col=mix(day*1.15,vec3(.95),cl*.92);
+  emis=pow(texture2D(tNight,vUv).rgb,vec3(2.2))*vec3(1.,.78,.5)*2.2*smoothstep(.08,-.18,ndls)*(1.-cl*.85);
+ }else if(uKind==3){
+  vec3 q=vec3(no.x,no.y*uP.x,no.z);float t1=fbm(q*2.+uSeed+vec3(uClock*.004,0.,0.));float s=fbm(q*3.+t1*uP.y*2.+vec3(0.,abs(no.y)*2.,0.));
+  col=mix(uC1,uC2,smoothstep(.3,.7,s));col=mix(col,uC3,smoothstep(.6,.85,t1)*.5);soft=.25;
+ }else{
+  float a=fbm(no*uP.x+uSeed);col=mix(uC1,uC2,smoothstep(.45,.75,a)*.8);
+  float r1=1.-abs(2.*vnoise(no*5.+fbm3(no*3.)*1.5+uSeed)-1.),r2=1.-abs(2.*vnoise(no*11.+uSeed*2.)-1.);
+  col=mix(col,uC3,(smoothstep(.9,.985,r1)+.6*smoothstep(.92,.99,r2))*uP.y);
+ }
+ float dif=max(ndl,0.);dif=mix(dif,smoothstep(-.12,1.,ndl)*.9,soft);
+ if(soft>0.)dif*=.55+.45*pow(ndv,.4);
+ float sh=shadow(vW-uBody);
+ vec3 c=col*dif*sh*1.15+vec3(1.,.95,.85)*spec*sh*smoothstep(0.,.1,ndls)+emis;
+ float fr=pow(1.-ndv,3.);float lit=smoothstep(-.1,.3,ndls)*sh;
+ c=mix(c,uAtm*lit*1.2,fr*uAtmK*.6)+uAtm*lit*fr*uAtmK*.25;
+ c+=col*.012; // lumière de fond très faible côté nuit
+ gl_FragColor=vec4(c,1.);
+}`;
+const RING_F=`
+#include <common>
+#include <logdepthbuf_pars_fragment>
+uniform vec3 uSun,uBody,uPole,uC1,uC2;uniform float uRp;
+varying vec3 vObj,vW;
+${NOISE}${RING}
+void main(){
+#include <logdepthbuf_fragment>
+ float r=length(vObj.xz);float d=ringD(r);if(d<.004)discard;
+ vec3 V=normalize(-vW);float mu=abs(dot(V,uPole));float a=1.-exp(-d*2.4/max(mu,.07));
+ float sS=dot(uSun,uPole),sV=dot(V,uPole);float b=(sS*sV>0.)?(.5+.5*d):(1.6*d*exp(-d*3.2)+.03);
+ b*=.75+.9*abs(sS);
+ vec3 p=vW-uBody;float t=dot(-p,uSun);float sh=1.;if(t>0.){float h=length(-p-uSun*t);sh=smoothstep(uRp*.985,uRp*1.01,h);}
+ vec3 col=mix(uC2,uC1,smoothstep(.15,.7,d))*(.9+.2*vnoise(vec3(r*1.7,1.,0.)));
+ gl_FragColor=vec4(col*b*sh*1.25,a);
+}`;
+const ATM_F=`
+#include <common>
+#include <logdepthbuf_pars_fragment>
+uniform vec3 uSun,uBody,uAtm,uSet;uniform float uR,uH,uK;
+varying vec3 vObj,vW;
+void main(){
+#include <logdepthbuf_fragment>
+ vec3 V=normalize(vW);float tc=dot(uBody,V);vec3 cp=V*tc-uBody;float b=length(cp);
+ float dens=b>uR?exp(-(b-uR)/uH):.10+.7*pow(b/uR,14.);
+ vec3 n=b>uR?cp/b:normalize(vW-uBody);float sd=dot(n,uSun);
+ float lit=smoothstep(-.16,.22,sd);vec3 col=mix(uSet*.45,uAtm,smoothstep(-.08,.1,sd));
+ gl_FragColor=vec4(col*dens*lit*uK,1.);
+}`;
+const SUN_F=`
+#include <common>
+#include <logdepthbuf_pars_fragment>
+uniform float uClock;uniform vec3 uTint;uniform mat3 uRot;varying vec3 vObj,vW;
+${NOISE}
+void main(){
+#include <logdepthbuf_fragment>
+ vec3 p=normalize(vObj);float t=uClock*.02;
+ float g=fbm(p*16.+vec3(0.,t,0.)),g2=fbm(p*46.-vec3(t*2.,0.,t)),cells=g*.55+g2*.45;
+ float sp=smoothstep(.7,.78,fbm3(p*4.+vec3(t*.03)))*smoothstep(.55,.2,abs(p.y));
+ float ndv=max(dot(normalize(uRot*p),normalize(-vW)),0.);float limb=.4+.6*pow(ndv,.5);
+ vec3 col=mix(vec3(1.,.36,.06),vec3(1.,.9,.62),smoothstep(.3,.72,cells))*(.5+1.15*cells)*limb*(1.-.8*sp)*uTint;
+ gl_FragColor=vec4(col,1.);
+}`;
+const CORONA_F=`
+#include <common>
+#include <logdepthbuf_pars_fragment>
+uniform float uK,uClock;uniform vec3 uTint;varying vec2 vUv;
+${NOISE}
+void main(){
+#include <logdepthbuf_fragment>
+ vec2 q=(vUv-.5)*2.;float r=length(q);float rr=r*uK;float an=atan(q.y,q.x);
+ float st=.7+.6*vnoise(vec3(cos(an)*3.,sin(an)*3.,uClock*.02))+.4*vnoise(vec3(cos(an)*9.,sin(an)*9.,7.));
+ float cor=rr>1.?pow(rr,-3.2)*.5*st:0.;
+ float glare=(exp(-r*r*55.)*2.6+exp(-r*r*7.)*.16)*clamp((uK-15.)/80.,0.,1.);
+ float f=smoothstep(1.,.55,r);
+ gl_FragColor=vec4((vec3(1.,.82,.58)*cor*f+vec3(1.,.93,.82)*glare*f)*mix(vec3(1.),uTint,.8),1.);
+}`;
+
+const IMG_F=`
+#include <common>
+#include <logdepthbuf_pars_fragment>
+uniform sampler2D tImg;uniform float uA;varying vec2 vUv;
+void main(){
+#include <logdepthbuf_fragment>
+ vec3 c=pow(texture2D(tImg,vUv).rgb,vec3(2.2));vec2 q=abs(vUv-.5)*2.;
+ float v=smoothstep(1.,.72,q.x)*smoothstep(1.,.72,q.y)*smoothstep(1.3,.8,length(q));
+ float l=max(c.r,max(c.g,c.b));c*=smoothstep(.002,.03,l);
+ gl_FragColor=vec4(c*v*uA*.95,1.);
+}`;
+// Trou noir : chaque pixel lance un rayon de lumière dont la trajectoire est intégrée dans la métrique de Schwarzschild (unité : 1 rayon de Schwarzschild).
+const BH_F=`
+#include <common>
+#include <logdepthbuf_pars_fragment>
+uniform vec3 uRo,uAxis,uE1,uE2,uTint;uniform float uIn,uOut,uGain,uClock;
+varying vec3 vW;
+${NOISE}
+void main(){
+#include <logdepthbuf_fragment>
+ vec3 rd=normalize(vW),ro=uRo;float RB=uOut+9.;
+ float b0=dot(ro,rd),c0=dot(ro,ro)-RB*RB;
+ if(c0>0.){float dd=b0*b0-c0;if(dd<0.||b0>0.)discard;ro+=rd*(-b0-sqrt(dd));}
+ vec3 p=ro,v=rd;vec3 hh=cross(p,v);float h2=dot(hh,hh);
+ vec3 col=vec3(0.);float tr=1.,hit=0.;
+ for(int i=0;i<120;i++){
+  float r2=dot(p,p),r=sqrt(r2);
+  if(r<1.01){hit=1.;break;}
+  if(r>RB+.6)break;
+  float dt=clamp((r-.85)*.2,.015,1.4);
+  vec3 pn=p+v*dt;v+=-1.5*h2*p/(r2*r2*r)*dt;
+  float s0=dot(p,uAxis),s1=dot(pn,uAxis);
+  if(s0*s1<0.){vec3 q=mix(p,pn,s0/(s0-s1));float rq=length(q);
+   if(rq>uIn&&rq<uOut){
+    float x=rq/uIn;float I=pow(x,-2.3)*smoothstep(1.,1.14,x)*smoothstep(uOut,uOut*.7,rq);
+    float ang=atan(dot(q,uE2),dot(q,uE1))-pow(rq,-1.5)*uClock*2.2;vec2 sw=vec2(cos(ang),sin(ang))*rq;
+    float tex=(.35+1.05*fbm3(vec3(sw*1.15,1.)))*(.72+.56*vnoise(vec3(rq*5.5,0.,0.)));
+    vec3 vd=normalize(cross(uAxis,q));float beta=sqrt(.5/rq);float cs=dot(vd,-normalize(v));
+    float g=sqrt(1.-beta*beta)/(1.-beta*cs)*sqrt(1.-1./rq);
+    vec3 c=mix(vec3(1.,.28,.05),vec3(1.,.9,.74),clamp(I*g*g*1.3,0.,1.))*uTint*I*tex*g*g*g*uGain*5.;
+    float a=clamp(I*tex*3.5,0.,.94);col+=tr*c*a;tr*=1.-a;}}
+  p=pn;}
+ gl_FragColor=vec4(col,hit>.5?1.:1.-tr);
+}`;
+const JET_V=`
+#include <common>
+#include <logdepthbuf_pars_vertex>
+varying vec3 vN,vW;varying vec2 vUv;
+void main(){vUv=uv;vN=mat3(modelMatrix)*normal;vec4 wp=modelMatrix*vec4(position,1.);vW=wp.xyz;gl_Position=projectionMatrix*viewMatrix*wp;
+#include <logdepthbuf_vertex>
+}`;
+const JET_F=`
+#include <common>
+#include <logdepthbuf_pars_fragment>
+uniform vec3 uCol;uniform float uI,uClock;varying vec3 vN,vW;varying vec2 vUv;
+${NOISE}
+void main(){
+#include <logdepthbuf_fragment>
+ float e=pow(abs(dot(normalize(vN),normalize(vW))),2.2);
+ float f=pow(1.-vUv.y,1.6)*smoothstep(0.,.015,vUv.y);
+ float k=.55+.9*vnoise(vec3(vUv.y*16.-uClock*.12,1.,2.));
+ gl_FragColor=vec4(uCol*uI*e*f*k,1.);
+}`;
+const CRAFT_F=`
+#include <common>
+#include <logdepthbuf_pars_fragment>
+uniform vec3 uSun,uCol;uniform float uSpec;varying vec3 vW;
+void main(){
+#include <logdepthbuf_fragment>
+ vec3 n=normalize(cross(dFdx(vW),dFdy(vW)));vec3 V=normalize(-vW);if(dot(n,V)<0.)n=-n;
+ float d=max(dot(n,uSun),0.);float sp=pow(max(dot(n,normalize(uSun+V)),0.),30.)*uSpec;
+ gl_FragColor=vec4(uCol*(d*1.05+.16)+vec3(1.,.96,.9)*sp,1.);
+}`;
+// Maquettes : rayon 1 = demi-envergure. L'axe X pointe vers la Terre (ISS, Hubble, sondes) ou vers le Soleil (James Webb).
+function buildCraft(b){
+  const g=new THREE.Group(),U={uRot:{value:new THREE.Matrix3()},uSun:{value:new THREE.Vector3(1,0,0)},uSunAng:{value:0},uPx:{value:0},uOcc:{value:[0,1,2,3].map(()=>new THREE.Vector4())}};
+  b.mat={uniforms:U};const mats={},H=Math.PI/2,WH='#d9dadd',PAN='#1b2a55',GOLD='#e0a93a',DK='#3a3c42',GR='#a9abb0';
+  const M=(c,sp)=>mats[c+sp]||(mats[c+sp]=new THREE.ShaderMaterial({vertexShader:VERT,fragmentShader:CRAFT_F,side:THREE.DoubleSide,extensions:{derivatives:true},uniforms:{uSun:U.uSun,uCol:{value:lin(c)},uSpec:{value:sp}}}));
+  const add=(geo,c,sp,x,y,z,rx,ry,rz)=>{const m=new THREE.Mesh(geo,M(c,sp||0));m.position.set(x||0,y||0,z||0);m.rotation.set(rx||0,ry||0,rz||0);m.frustumCulled=false;g.add(m);return m};
+  const box=(w,h,d,c,sp,x,y,z,rx,ry,rz)=>add(new THREE.BoxGeometry(w,h,d),c,sp,x,y,z,rx,ry,rz);
+  const cyl=(r1,r2,h,n,c,sp,x,y,z,rx,ry,rz,open)=>add(new THREE.CylinderGeometry(r1,r2,h,n,1,!!open),c,sp,x,y,z,rx,ry,rz);
+  if(b.craft==='iss'){
+    box(.05,.05,1.98,'#b9bbc0',.2);
+    [-.93,-.66,.66,.93].forEach(z=>[-1,1].forEach(s=>box(.008,.6,.21,PAN,.7,0,s*.36,z)));
+    [-.3,.3].forEach(z=>box(.008,.26,.11,WH,.3,0,-.19,z));
+    cyl(.042,.042,.95,16,WH,.3);cyl(.038,.038,.36,16,WH,.3,0,.3,0,H);cyl(.038,.038,.3,16,WH,.3,0,-.12,0,H);cyl(.035,.035,.22,16,WH,.3,.1,-.3,0,0,0,H);
+  }else if(b.craft==='hst'){
+    cyl(.32,.32,1.25,24,'#c8cbd2',.9,-.38,0,0,0,0,H);cyl(.37,.37,.75,24,'#b4b8c0',.8,.62,0,0,0,0,H);
+    box(.02,.62,.62,'#c8cbd2',.6,-1.12,.36,0,0,0,-.75);
+    [-1,1].forEach(s=>{box(1.08,.012,.4,PAN,.7,0,0,s*.72);box(.03,.03,.22,DK,0,0,0,s*.42)});
+    cyl(.01,.01,.5,6,GR,.2,.3,.5,0);cyl(.06,.06,.01,12,WH,.3,.3,.75,0);
+  }else if(b.craft==='jwst'){
+    [0,-.035,-.07].forEach((x,i)=>{const m=cyl(1,1,.008,4,i?'#cdbfd6':'#e6dcea',.9,x,0,0,0,0,H);m.scale.set(.67,1,1)});
+    cyl(.31,.31,.025,6,GOLD,1,-.42,0,0,H);box(.012,.012,.5,DK,0,-.42,0,.25);box(.012,.3,.012,DK,0,-.28,0,.38,.5);cyl(.04,.04,.01,6,GOLD,1,-.42,0,.5,H);
+    box(.16,.22,.22,'#8d8f96',.3,.1);box(.012,.1,.4,PAN,.7,.2,-.5,0);
+  }else if(b.craft==='voy'){
+    cyl(.25,.04,.09,28,WH,.4,.05,0,0,0,0,-H,true);cyl(.12,.12,.06,10,DK,.2,-.03,0,0,0,0,H);
+    box(.01,1.7,.01,GR,.2,-.03,.95,0);cyl(.03,.03,.42,10,'#55575c',.3,-.03,-.36,0);
+    box(.012,.012,.42,GR,.2,-.03,0,.33);box(.07,.07,.07,WH,.3,-.03,0,.56);cyl(.04,.04,.008,20,GOLD,1,-.03,0,-.125,H);
+  }else{
+    cyl(.7,.1,.22,28,WH,.4,.14,0,0,0,0,-H,true);cyl(.55,.55,.26,3,GOLD,.6,-.12,0,0,0,0,H);cyl(.09,.09,.7,10,DK,.3,-.12,-.8,0);
+  }
+  g.scale.setScalar(b.Rm);g.visible=false;scene.add(g);b.mesh=g}
+const jetGeo=new THREE.CylinderGeometry(1,.004,1,64,1,true);jetGeo.translate(0,.5,0);
+const YAX=new THREE.Vector3(0,1,0);
+const plane=new THREE.PlaneGeometry(2,2);
+const white=new THREE.DataTexture(new Uint8Array([128,128,128,255]),1,1,THREE.RGBAFormat);white.needsUpdate=true;
+const tex={day:white,night:white,water:white,cloud:white};
+const sphere=new THREE.SphereGeometry(1,128,64);
+const clockU={value:0};
+B.forEach((b,k)=>{
+  b.Rm=b.R/1000;
+  if(b.craft){buildCraft(b);return}
+  if(b.jet){const jm=new THREE.ShaderMaterial({vertexShader:JET_V,fragmentShader:JET_F,transparent:true,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending,uniforms:{uCol:{value:new THREE.Vector3().fromArray(b.jet.col)},uI:{value:b.jet.I},uClock:clockU}});
+    b.jets=(b.jet.one?[1]:[1,-1]).map(sg=>{const m=new THREE.Mesh(jetGeo,jm);m.frustumCulled=false;m.renderOrder=5;m.userData.sg=sg;m.visible=false;scene.add(m);return m})}
+  if(b.kind==='bh'){const e1=new THREE.Vector3().crossVectors(b.axis,new THREE.Vector3(.31,.2,.93)).normalize(),e2=new THREE.Vector3().crossVectors(b.axis,e1);
+    b.mat=new THREE.ShaderMaterial({vertexShader:VERT,fragmentShader:BH_F,transparent:true,depthWrite:false,blending:THREE.CustomBlending,blendSrc:THREE.OneFactor,blendDst:THREE.OneMinusSrcAlphaFactor,
+      uniforms:{uRo:{value:new THREE.Vector3()},uAxis:{value:b.axis},uE1:{value:e1},uE2:{value:e2},uTint:{value:new THREE.Vector3().fromArray(b.tint)},uIn:{value:b.disc[0]},uOut:{value:b.disc[1]},uGain:{value:b.gain},uClock:clockU}});
+    b.mesh=new THREE.Mesh(plane,b.mat);b.mesh.frustumCulled=false;b.mesh.renderOrder=6;b.mesh.visible=false;scene.add(b.mesh);return}
+  if(b.flat){
+    if(b.img){b.mat=new THREE.ShaderMaterial({vertexShader:VERT,fragmentShader:IMG_F,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,uniforms:{tImg:{value:white},uA:{value:1}}});
+      b.mesh=new THREE.Mesh(plane,b.mat);b.mesh.frustumCulled=false;b.mesh.visible=false;b.mesh.renderOrder=0;scene.add(b.mesh)}
+    return}
+  if(b.kind==='sun'){const tv=new THREE.Vector3().fromArray(b.tint);
+    b.mat=new THREE.ShaderMaterial({vertexShader:VERT,fragmentShader:SUN_F,uniforms:{uClock:clockU,uTint:{value:tv},uRot:{value:new THREE.Matrix3()}}});
+    b.cor=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.ShaderMaterial({vertexShader:VERT,fragmentShader:CORONA_F,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,uniforms:{uK:{value:14},uClock:clockU,uTint:{value:tv}}}));
+    b.cor.frustumCulled=false;b.cor.renderOrder=4;scene.add(b.cor);
+  }else{
+    const s=b.s,c=s.c.map(lin);
+    b.mat=new THREE.ShaderMaterial({vertexShader:VERT,fragmentShader:PLANET_F,uniforms:{
+      uKind:{value:s.k},uSun:{value:new THREE.Vector3(1,0,0)},uC1:{value:c[0]},uC2:{value:c[1]},uC3:{value:c[2]},uC4:{value:c[3]||c[0]},
+      uAtm:{value:b.atm?lin(b.atm[0]):new THREE.Color(0)},uAtmK:{value:b.atm?b.atm[1]:0},uBody:{value:b.rel},uPole:{value:b.poleV},
+      uP:{value:new THREE.Vector4().fromArray(s.P)},uOcc:{value:[0,1,2,3].map(()=>new THREE.Vector4())},uRing:{value:new THREE.Vector4(0,0,0,b.ring||0)},
+      uSunAng:{value:.0046},uSeed:{value:k*1.37+.5},uClock:clockU,uBump:{value:s.bump||0},uPx:{value:100},uRot:{value:new THREE.Matrix3()},
+      tDay:{value:white},tNight:{value:white},tWater:{value:white},tCloud:{value:white}}});
+  }
+  b.mesh=new THREE.Mesh(sphere,b.mat);b.mesh.frustumCulled=false;b.mesh.scale.set(b.Rm,b.Rm*(b.obl||1),b.Rm);scene.add(b.mesh);
+  if(b.atm&&!b.obl){const H=b.Rm*b.atm[2];
+    b.amat=new THREE.ShaderMaterial({vertexShader:VERT,fragmentShader:ATM_F,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,
+      uniforms:{uSun:b.mat.uniforms.uSun,uBody:{value:b.rel},uAtm:{value:lin(b.atm[0])},uSet:{value:b===EARTH?lin('#ff7a3a'):lin(b.atm[0])},uR:{value:b.Rm},uH:{value:H},uK:{value:b.atm[1]*.8}}});
+    b.amesh=new THREE.Mesh(sphere,b.amat);b.amesh.frustumCulled=false;const sR=b.Rm+H*7;b.amesh.scale.set(sR,sR*(b.obl||1),sR);b.amesh.renderOrder=2;scene.add(b.amesh)}
+  if(b.ring){const io=b.ring===1?[66,141.5]:[41,52];
+    const g=new THREE.RingGeometry(io[0],io[1],256,1);g.rotateX(-Math.PI/2);
+    b.rmat=new THREE.ShaderMaterial({vertexShader:VERT,fragmentShader:RING_F,transparent:true,depthWrite:false,side:THREE.DoubleSide,extensions:{derivatives:true},
+      uniforms:{uSun:b.mat.uniforms.uSun,uBody:{value:b.rel},uPole:{value:b.poleV},uRing:b.mat.uniforms.uRing,uRp:{value:b.Rm*(b.obl||1)},
+        uC1:{value:b.ring===1?lin('#eadbb6'):lin('#9aa3ad')},uC2:{value:b.ring===1?lin('#8d8474'):lin('#7b838c')}}});
+    b.rmesh=new THREE.Mesh(g,b.rmat);b.rmesh.frustumCulled=false;b.rmesh.renderOrder=3;scene.add(b.rmesh);
+    b.rmesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),b.poleV)}
+});
+const eU=EARTH.mat.uniforms;
+/* ---- étoiles réelles (magnitude ≤ 8) et Voie lactée ---- */
+const starMat=new THREE.ShaderMaterial({depthTest:true,depthWrite:false,transparent:true,blending:THREE.AdditiveBlending,
+ uniforms:{uPx:{value:DPR},uFade:{value:1}},
+ vertexShader:`attribute vec3 aCol;attribute float aMag;uniform float uPx,uFade;varying vec3 vC;varying float vA;
+ void main(){float lum=pow(2.512,4.6-aMag);float s=clamp(sqrt(lum)*1.5,1.,9.);vA=min(lum*.9,1.6)*min(1.,lum*3.+.25)*uFade;vC=aCol;gl_PointSize=(s+.6)*uPx;
+ vec4 p=projectionMatrix*viewMatrix*vec4(position,0.);gl_Position=vec4(p.xy,p.w*.99999,p.w);}`,
+ fragmentShader:`varying vec3 vC;varying float vA;void main(){vec2 q=gl_PointCoord-.5;float r=length(q)*2.;float f=exp(-r*r*5.)*smoothstep(1.,.7,r);gl_FragColor=vec4(vC*vA*f*1.5,1.);}`});
+let stars=null;
+function buildStars(a){const n=a.length/5,pos=new Float32Array(n*3),col=new Float32Array(n*3),mag=new Float32Array(n);
+  for(let i=0;i<n;i++){pos[i*3]=a[i*5]/32767;pos[i*3+1]=a[i*5+1]/32767;pos[i*3+2]=a[i*5+2]/32767;mag[i]=a[i*5+3]/100;
+    const bv=a[i*5+4]/1000,t=Math.min(Math.max((bv+.3)/1.9,0),1);
+    col[i*3]=Math.min(1,.62+1.1*t);col[i*3+1]=.74+.4*t-.75*t*t;col[i*3+2]=Math.max(.25,1.05-.95*t)}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));g.setAttribute('aCol',new THREE.BufferAttribute(col,3));g.setAttribute('aMag',new THREE.BufferAttribute(mag,1));
+  stars=new THREE.Points(g,starMat);stars.frustumCulled=false;stars.renderOrder=-9;scene.add(stars)}
+const GN=eq2three(192.85948,27.12825),GC=eq2three(266.405,-28.936);
+const milky=new THREE.Mesh(new THREE.SphereGeometry(1,32,16),new THREE.ShaderMaterial({side:THREE.BackSide,depthTest:false,depthWrite:false,
+ uniforms:{uGN:{value:GN},uGC:{value:GC},uGY:{value:new THREE.Vector3().crossVectors(GN,GC)},uFade:{value:1}},
+ vertexShader:`varying vec3 vD;void main(){vD=position;vec4 p=projectionMatrix*viewMatrix*vec4(position,0.);gl_Position=vec4(p.xy,p.w*.99999,p.w);}`,
+ fragmentShader:`uniform vec3 uGN,uGC,uGY;uniform float uFade;varying vec3 vD;${NOISE}
+ void main(){vec3 d=normalize(vD);float sb=dot(d,uGN);float cl=dot(d,uGC),sl=dot(d,uGY);vec3 g=vec3(cl,sl,sb);
+ float cen=.5+.5*cl;float w=.11+.09*cen;float band=exp(-sb*sb/(w*w));float bulge=exp(-((1.-cl)*9.+sb*sb*30.));
+ float n=fbm(g*5.);float n2=fbm(g*16.+3.);float dust=smoothstep(.42,.7,fbm(g*vec3(4.,4.,13.)+7.))*exp(-sb*sb/.006);
+ float I=band*(.25+.75*cen*cen)*(.45+1.1*n*n2*2.)+bulge*.9;I*=1.-.8*dust;
+ vec3 c=mix(vec3(.55,.65,1.),vec3(1.,.82,.6),cen*cen+bulge)*I*.075+vec3(.0015,.002,.004);
+ gl_FragColor=vec4(c*uFade,1.);}`}));
+milky.frustumCulled=false;milky.renderOrder=-10;scene.add(milky);
+
+function rnd(seed){let s=seed>>>0;return()=>{s=(s+0x6D2B79F5)|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function gauss(r){return Math.sqrt(-2*Math.log(1-r()*.9999))*Math.cos(TAU*r())}
+/* ---- Voie lactée vue de l'extérieur : disque procédural + 90 000 étoiles en volume ----
+   Modèle : 4 bras en spirale logarithmique (angle d'enroulement 12,5°), barre centrale inclinée de 27°, Soleil à 26,7 kal du centre. */
+const MW=byId.voielactee;
+const gEx=GC.clone().negate(),gEz=GN.clone(),gEy=new THREE.Vector3().crossVectors(gEz,gEx).normalize();gEx.crossVectors(gEy,gEz).normalize();
+const ARM_K=1/Math.tan(12.5*D2R),ARM_PHI=.75*Math.PI+4*ARM_K*Math.log(26.7);
+const galaxy=new THREE.Group();galaxy.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(gEx,gEy,gEz));scene.add(galaxy);
+const galU={uFade:{value:0},uPx:{value:DPR},uDim:{value:1},uN:{value:gEz},uK:{value:1}};
+const galDisc=new THREE.Mesh(new THREE.PlaneGeometry(130*KLY,130*KLY),new THREE.ShaderMaterial({transparent:true,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending,uniforms:galU,
+ vertexShader:VERT,fragmentShader:`
+ #include <common>
+ #include <logdepthbuf_pars_fragment>
+ uniform float uFade,uK;uniform vec3 uN;varying vec2 vUv;varying vec3 vW;${NOISE}
+ void main(){
+ #include <logdepthbuf_fragment>
+  vec2 p=(vUv-.5)*130.;float r=length(p)+.001,th=atan(p.y,p.x);float psi=th-${ARM_K.toFixed(4)}*log(r);
+  float n=fbm(vec3(p*.33,1.)),n2=fbm(vec3(p*1.3,5.));
+  float a4=.5+.5*cos(4.*psi+${ARM_PHI.toFixed(4)}+(n-.5)*2.4);float maj=.62+.38*cos(2.*psi+${(ARM_PHI/2).toFixed(4)});
+  float arm=pow(a4,2.6)*maj;float disc=exp(-r/10.5)*smoothstep(2.,6.,r);
+  float dust=pow(.5+.5*cos(4.*psi+${ARM_PHI.toFixed(4)}+.9+(n2-.5)*2.),5.)*smoothstep(.35,.7,n2);
+  float cb=cos(.471),sb=sin(.471);vec2 q=vec2(p.x*cb+p.y*sb,-p.x*sb+p.y*cb);
+  float bar=exp(-(q.x*q.x/60.+q.y*q.y/7.)),bulge=exp(-r*r/14.);
+  vec3 c=vec3(.62,.74,1.)*disc*(.16+1.9*arm)*(.45+1.6*n*n2*2.)*2.4;
+  c+=vec3(1.,.28,.42)*pow(vnoise(vec3(p*2.2,3.)),9.)*arm*disc*90.;
+  c*=1.-.75*dust;
+  c+=vec3(1.,.8,.52)*(bulge*.34+bar*.2)+vec3(1.,.86,.66)*exp(-r/7.)*.07;
+  c*=smoothstep(63.,42.,r)*uFade*.2*smoothstep(.03,.3,abs(dot(normalize(vW),uN)))*smoothstep(2.,12.,length(vW)/uK/9.4607e12);
+  gl_FragColor=vec4(c,1.);}`}));
+galDisc.frustumCulled=false;galDisc.renderOrder=-2;galaxy.add(galDisc);
+(function(){const N=90000,r=rnd(7),pos=new Float32Array(N*3),col=new Float32Array(N*3);
+  for(let k=0;k<N;k++){let x,y,z,c;
+    if(k<N*.1){const u=gauss(r)*4.6,v=gauss(r)*1.9;x=u*Math.cos(.471)-v*Math.sin(.471);y=u*Math.sin(.471)+v*Math.cos(.471);z=gauss(r)*1.5;c=[.45,.35,.22]}
+    else{const R=Math.min(58,2.5-11*Math.log(1-r()*.995));let th;
+      if(r()<.72){const m=Math.floor(r()*4),w=(m%2?.75:1);if(r()>w){th=r()*TAU}else th=(TAU*m-ARM_PHI)/4+ARM_K*Math.log(R)+gauss(r)*.17}else th=r()*TAU;
+      x=R*Math.cos(th);y=R*Math.sin(th);z=gauss(r)*.3;const t=r();c=t<.6?[.7,.8,1]:t<.9?[1,.92,.8]:[1,.5,.6]}
+    const br=.25+1.2*Math.pow(r(),4);pos[k*3]=x*KLY;pos[k*3+1]=y*KLY;pos[k*3+2]=z*KLY;col[k*3]=c[0]*br;col[k*3+1]=c[1]*br;col[k*3+2]=c[2]*br}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));g.setAttribute('aCol',new THREE.BufferAttribute(col,3));
+  const pts=new THREE.Points(g,new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,uniforms:galU,
+   vertexShader:`#include <common>
+   #include <logdepthbuf_pars_vertex>
+   attribute vec3 aCol;uniform float uPx,uFade,uDim;varying vec3 vC;void main(){vC=aCol*uFade*uDim;gl_PointSize=(1.3+uDim)*uPx;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);
+   #include <logdepthbuf_vertex>
+   }`,
+   fragmentShader:`#include <common>
+   #include <logdepthbuf_pars_fragment>
+   varying vec3 vC;void main(){
+   #include <logdepthbuf_fragment>
+   float f=smoothstep(.5,.1,length(gl_PointCoord-.5));gl_FragColor=vec4(vC*f*.4,1.);}`}));
+  pts.frustumCulled=false;pts.renderOrder=-1;galaxy.add(pts)})();
+
+/* ---- petits corps : orbites képlériennes résolues dans le vertex shader ---- */
+const NB=30000,NT=3000,NK=14000,NS=NB+NT+NK;
+const sA=new Float32Array(NS*3),sB=new Float32Array(NS*4),sC=new Float32Array(NS*3);
+(function(){const r=rnd(20261112),K=0.01720209895; // constante de Gauss (rad/jour)
+  const gaps=[2.502,2.825,2.958,3.279,2.065];const LJ=34.39644051*D2R;
+  for(let k=0;k<NS;k++){let a,e,i,L=null,n,c;
+    if(k<NB){do{a=2.12+1.2*Math.pow(r(),.85);if(r()<.25)a=2.2+.3*r();if(r()<.2)a=3.05+.2*r()}while(gaps.some(g=>Math.abs(a-g)<.022)&&r()<.93);
+      e=Math.min(.35,Math.abs(gauss(r))*.09+.02);i=Math.abs(gauss(r))*8.5*D2R;const s=r();c=s<.6?[.62,.56,.5]:s<.9?[.82,.7,.58]:[.7,.72,.76];n=K/Math.pow(a,1.5)}
+    else if(k<NB+NT){a=5.2+gauss(r)*.04;e=Math.abs(gauss(r))*.06;i=Math.abs(gauss(r))*11*D2R;L=LJ+(k%2?1:-1)*Math.PI/3+gauss(r)*.21;n=K/Math.pow(5.202887,1.5);c=[.6,.5,.44]}
+    else{const s=r();if(s<.62){a=42+5.5*r();e=Math.abs(gauss(r))*.06;i=Math.abs(gauss(r))*4*D2R}else if(s<.85){a=39.45+gauss(r)*.15;e=.12+.16*r();i=Math.abs(gauss(r))*10*D2R}else{a=50+45*r()*r();e=Math.min(.65,1-(33+7*r())/a);i=Math.abs(gauss(r))*17*D2R}
+      n=K/Math.pow(a,1.5);c=s<.62?[.75,.6,.55]:[.62,.68,.8]}
+    const Om=r()*TAU,w=r()*TAU,M0=L===null?r()*TAU:L-Om-w;
+    sA.set([a,e,i],k*3);sB.set([Om,w,M0,n],k*4);const br=.45+.9*Math.pow(r(),3);sC.set([c[0]*br,c[1]*br,c[2]*br],k*3)}
+})();
+const beltG=new THREE.BufferGeometry();beltG.setAttribute('position',new THREE.BufferAttribute(sA,3));beltG.setAttribute('aO',new THREE.BufferAttribute(sB,4));beltG.setAttribute('aCol',new THREE.BufferAttribute(sC,3));
+const beltMat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,
+ uniforms:{uD:{value:0},uSunRel:{value:SUN.rel},uPx:{value:DPR},uFade:{value:1}},
+ vertexShader:`#include <common>
+ #include <logdepthbuf_pars_vertex>
+ attribute vec4 aO;attribute vec3 aCol;uniform float uD,uPx,uFade;uniform vec3 uSunRel;varying vec3 vC;
+ void main(){float a=position.x,e=position.y,inc=position.z;float M=aO.z+aO.w*uD;float E=M+e*sin(M);
+  for(int k=0;k<5;k++)E-=(E-e*sin(E)-M)/(1.-e*cos(E));
+  float xp=a*(cos(E)-e),yp=a*sqrt(1.-e*e)*sin(E);float cw=cos(aO.y),sw=sin(aO.y),cO=cos(aO.x),sO=sin(aO.x),ci=cos(inc),si=sin(inc);
+  vec3 p=vec3((cw*cO-sw*sO*ci)*xp+(-sw*cO-cw*sO*ci)*yp,sw*si*xp+cw*si*yp,-((cw*sO+sw*cO*ci)*xp+(-sw*sO+cw*cO*ci)*yp))*${AU.toFixed(4)}+uSunRel;
+  float dist=length(p);float s=clamp(${(AU*2.2).toFixed(1)}/dist,.35,2.2);
+  vC=aCol*min(1.,s)*uFade*(a>30.?1.6:1.);gl_PointSize=max(1.,s)*uPx*1.15;
+  gl_Position=projectionMatrix*viewMatrix*vec4(p,1.);
+  #include <logdepthbuf_vertex>
+ }`,
+ fragmentShader:`#include <common>
+ #include <logdepthbuf_pars_fragment>
+ varying vec3 vC;void main(){
+ #include <logdepthbuf_fragment>
+ vec2 q=gl_PointCoord-.5;float f=smoothstep(.5,.15,length(q));gl_FragColor=vec4(vC*f*.55,1.);}`});
+const belt=new THREE.Points(beltG,beltMat);belt.frustumCulled=false;belt.renderOrder=1;scene.add(belt);
+
+/* ---- repères lumineux des astres lointains ---- */
+const mkPos=new Float32Array(B.length*3),mkCol=new Float32Array(B.length*4),mkSz=new Float32Array(B.length).fill(7);
+const mkG=new THREE.BufferGeometry();mkG.setAttribute('position',new THREE.BufferAttribute(mkPos,3));mkG.setAttribute('aCol',new THREE.BufferAttribute(mkCol,4));mkG.setAttribute('aSz',new THREE.BufferAttribute(mkSz,1));
+B.forEach((b,i)=>{if(b.kind==='bh'||b.ns)mkSz[i]=11;else if(b.kind==='sun')mkSz[i]=13*(1+.3*Math.log10(b.Rs)+(b.T>7000?.25:0))});
+const markers=new THREE.Points(mkG,new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,uniforms:{uPx:{value:DPR}},
+ vertexShader:`#include <common>
+ #include <logdepthbuf_pars_vertex>
+ attribute vec4 aCol;attribute float aSz;uniform float uPx;varying vec4 vC;void main(){vC=aCol;gl_PointSize=aSz*uPx;gl_Position=projectionMatrix*viewMatrix*vec4(position,1.);
+ #include <logdepthbuf_vertex>
+ }`,
+ fragmentShader:`#include <common>
+ #include <logdepthbuf_pars_fragment>
+ varying vec4 vC;void main(){
+ #include <logdepthbuf_fragment>
+ float r=length(gl_PointCoord-.5)*2.;gl_FragColor=vec4(vC.rgb*vC.a*exp(-r*r*6.)*1.6,1.);}`}));
+markers.frustumCulled=false;markers.renderOrder=5;scene.add(markers);
+B.forEach(b=>{b.lc=lin(b.col)});
+
+/* ---- tracés d'orbites ---- */
+const ORB_N=720;
+B.forEach(b=>{ if(!b.par)return;const n=b.mo?256:ORB_N;
+  b.og=new THREE.BufferGeometry();b.og.setAttribute('position',new THREE.BufferAttribute(new Float32Array((n+1)*3),3));
+  b.ol=new THREE.Line(b.og,new THREE.LineBasicMaterial({color:lin(b.col),transparent:true,opacity:.4,depthWrite:false}));
+  b.ol.frustumCulled=false;b.od=1e99;scene.add(b.ol)});
+const oT=[0,0,0];
+function buildOrbit(b,d){const a=b.og.attributes.position.array,n=a.length/3-1;
+  // On échantillonne en anomalie moyenne à partir de la position actuelle : le tracé passe exactement par l'astre.
+  let M0;if(b.mo){M0=b===MOON?lunaEl(d)[5]:b.M0+TAU*d/b.mo[1]}else{const q=planetEl(b,d);M0=q[3]-q[4]}
+  for(let k=0;k<=n;k++){const M=M0+TAU*k/n;if(b.mo)moonRel(b,d,oT,M);else planetPos(b,d,oT,M);a[k*3]=oT[0];a[k*3+1]=oT[1];a[k*3+2]=oT[2]}
+  b.og.attributes.position.needsUpdate=true;b.od=d}
+
+/* ============ état, caméra, temps ============ */
+const nowD=()=>Date.now()/864e5-10957.5;
+const RATES=[-31557600,-2592000,-604800,-86400,-3600,-60,1,60,3600,86400,604800,2592000,31557600];
+const RLAB={1:'temps réel',60:'1 min / s',3600:'1 h / s',86400:'1 jour / s',604800:'1 semaine / s',2592000:'1 mois / s',31557600:'1 an / s'};
+const S={info:window.innerWidth>=720,tab:'sol',d:nowD(),ri:6,paused:false,focus:EARTH,prev:EARTH,tr:1,trDur:1,d0:30,yaw:0,pitch:.22,dist:30,distT:30,vy:0,vp:0,orbits:true,labels:true,W:1,H:1};
+const reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches;
+const camPos=[0,0,0],fp=[0,0,0];
+function halfFov(){const v=camera.fov*D2R/2;return Math.min(v,Math.atan(Math.tan(v)*camera.aspect))}
+function arrive(b){if(b===MW)return b.Rm*1.25/Math.tan(halfFov());
+  if(b.flat){const v=camera.fov*D2R/2;return Math.max(b.Rm/b.asp/Math.tan(v),b.Rm/(Math.tan(v)*camera.aspect))*1.04}
+  if(b.ns)return b.jet.len*4.5;
+  const k=b.kind==='bh'?b.disc[1]*1.25:b.ring===1?2.6:b.kind==='sun'?1.5:1;return b.Rm*k/Math.sin(halfFov()*.56)}
+const minDist=b=>b.flat?b.Rm*.1:b.kind==='bh'?b.Rm*2.2:b.craft?b.Rm*1.5:b.Rm*1.12;
+function setFocus(b,instant){if(b===S.focus&&!instant)return;S.prev=S.focus;S.focus=b;S.d0=S.dist;S.distT=arrive(b);S.tab=b.cat;
+  const sep=Math.hypot(b.pos[0]-S.prev.pos[0],b.pos[1]-S.prev.pos[1],b.pos[2]-S.prev.pos[2]);
+  S.sep=sep;S.trDur=instant||reduce?.001:Math.min(5.5,1.4+.55*Math.log10(1+sep/50));S.tr=instant?1:0;if(instant){S.dist=S.distT}
+  renderRail();renderSheet(true);document.getElementById('name').textContent=b.n;document.getElementById('kind').textContent=b.t;
+  try{history.replaceState(null,'','#'+b.id)}catch(e){}}
+
+/* ============ interface ============ */
+const $=id=>document.getElementById(id);
+const labels=$('labels');
+B.forEach(b=>{const e=document.createElement('button');e.className='lb'+(b.mo?' moon':b.cat!=='sol'?' far':'');e.textContent=b.n;e.hidden=true;e.tabIndex=-1;e.addEventListener('click',()=>setFocus(b));labels.appendChild(e);b.lb=e});
+const TABS=[['sol','Système solaire'],['craft','Engins'],['star','Étoiles'],['neb','Nébuleuses'],['ext','Extrêmes'],['gal','Galaxies']];
+function renderRail(){const tb=$('tabs');tb.textContent='';
+  TABS.forEach(t=>{const e=document.createElement('button');e.className='tab';e.textContent=t[1];e.setAttribute('aria-pressed',S.tab===t[0]);e.addEventListener('click',()=>{S.tab=t[0];renderRail()});tb.appendChild(e)});
+  const r=$('rail');r.textContent='';
+  B.filter(b=>b.cat===S.tab&&(!b.mo||b.craft)).forEach(b=>{add(b);if(S.focus.sys===b&&!b.craft)b.kids.forEach(k=>{if(k.mo&&!k.craft)add(k)})});
+  function add(b){const c=document.createElement('button');c.className='chip'+(b.mo&&!b.craft?' moon':'');c.style.setProperty('--c',b.col);c.innerHTML='<i></i>';c.append(b.n);
+    if(b===S.focus)c.setAttribute('aria-current','true');c.addEventListener('click',()=>setFocus(b));r.appendChild(c);
+    if(b===S.focus)requestAnimationFrame(()=>{const x=c.offsetLeft-(r.clientWidth-c.offsetWidth)/2;r.scrollTo({left:x,behavior:reduce?'auto':'smooth'})})}
+  if(!r.querySelector('[aria-current]'))r.scrollLeft=0}
+const nf=(v,d=0)=>v.toLocaleString('fr-FR',{maximumFractionDigits:d,minimumFractionDigits:d});
+const SUP='⁰¹²³⁴⁵⁶⁷⁸⁹';
+function sci(v){const e=Math.floor(Math.log10(v));return nf(v/Math.pow(10,e),3)+' × 10'+String(e).split('').map(c=>c==='-'?'⁻':SUP[c]).join('')}
+const KMLY=9.4607e12;
+function fLy(ly){const a=Math.abs(ly);return a>=1e9?nf(ly/1e9,2)+" milliards d'al":a>=1e6?nf(ly/1e6,2)+" millions d'al":a>=1e4?nf(Math.round(ly/100)*100,0)+' al':a>=100?nf(ly,0)+' al':nf(ly,a<10?2:1)+' al'}
+function fDist(km){const a=Math.abs(km);if(a>=KMLY*.05)return fLy(km/KMLY);if(a>=1.5e7)return nf(km/149597870.7,a>=1.5e9?a>=1.5e11?0:2:3)+' UA';if(a>=1e6)return nf(km/1e6,2)+' millions de km';if(a<1)return nf(km*1000,0)+' m';return nf(km,a<100?1:0)+' km'}
+function fDur(days){const a=Math.abs(days);if(a>=365.25*1.5)return nf(a/365.25,2)+' ans';if(a>=3)return nf(a,2)+' jours';const h=a*24;if(h>=1){const hh=Math.floor(h),mm=Math.round((h-hh)*60);return hh+' h '+String(mm).padStart(2,'0')+' min'}return Math.round(h*60)+' min'}
+function fLight(km){const s=km/299792.458;if(s<90)return nf(s,1)+' s';if(s<5400)return Math.floor(s/60)+' min '+String(Math.round(s%60)).padStart(2,'0')+' s';return nf(s/3600,2)+' h'}
+const live={};
+function renderSheet(full){const b=S.focus,el=$('sheet');
+  if(full){const rows=[];let note='';
+    if(b.flat){rows.push(['Type',b.t.split(' · ')[0]]);if(b.t.includes(' · '))rows.push(['Catalogue',b.t.split(' · ')[1]]);
+      rows.push([b===MW?'Distance du centre':'Distance',fLy(b.fx[2])],[b===MW?'Diamètre':'Largeur du champ',fLy(b===MW?100000:b.szly)]);
+      if(b===MW)rows.push(['Étoiles','100 à 400 milliards'],['Âge','13,6 milliards d\'années'],['Tour du Soleil','230 millions d\'années']);
+      else rows.push(['Lumière partie il y a',b.fx[2]>=1e6?nf(b.fx[2]/1e6,1)+" millions d'années":nf(b.fx[2],0)+' ans']);
+      if(b.cred)note='Image : '+b.cred+'. Vue depuis la Terre ; elle reste face à vous quand vous tournez.'}
+    else if(b.craft){b.rows.forEach(r=>rows.push(r));
+      if(b.mo)rows.push(['Vitesse orbitale','<span id="lvV"></span>']);
+      else rows.push(['Distance au Soleil','<span id="lvS"></span>'],['Distance à la Terre','<span id="lvE"></span>'],['Délai radio','<span id="lvR"></span>'],['Vitesse','<span id="lvV"></span>']);
+      note=CRAFT_NOTE[b.nk]}
+    else if(b.kind==='bh'){const M=b.ms;rows.push(['Type',b.t],['Masse',(M>=1e9?nf(M/1e9,2)+' milliards de':M>=1e6?nf(M/1e6,2)+' millions de':nf(M,1))+' M☉'],['Rayon de l\'horizon',fDist(b.R)],['Distance',fLy(b.fx[2])],['Lumière partie il y a',b.fx[2]>=1e9?nf(b.fx[2]/1e9,2)+" milliards d'années":b.fx[2]>=1e6?nf(b.fx[2]/1e6,1)+" millions d'années":nf(b.fx[2],0)+' ans']);
+      note="La déviation de la lumière est calculée rayon par rayon (métrique de Schwarzschild) : l'ombre, l'anneau de photons et l'image du disque repliée au-dessus du trou noir en découlent. La rotation du disque est mise à une vitesse visible et le fond du ciel n'est pas déformé."}
+    else if(b.ns){rows.push(['Distance',fLy(b.fx[2])],['Rayon','environ 10 km'],['Masse','1,4 M☉'],['Densité','≈ 7 × 10¹⁴ g/cm³'],['Période de rotation',b.ns.P<1?nf(b.ns.P*1000,1)+' ms':nf(b.ns.P,2)+' s'],['Champ magnétique',b.ns.B]);
+      note=b.ns.Pv!==b.ns.P?"Rotation ralentie environ 50 fois pour rester visible. Taille des faisceaux indicative.":"Rotation affichée à sa vitesse réelle. Taille des faisceaux indicative."}
+    else{const g=G*b.m/Math.pow(b.R*1000,2),ve=Math.sqrt(2*G*b.m/(b.R*1000))/1000,rho=b.m/(4/3*Math.PI*Math.pow(b.R*1000,3))/1000;
+      if(b.kind==='sun'&&b!==SUN)rows.push(['Distance au Soleil',fLy(b.fx[2])],['Rayon',nf(b.Rs,b.Rs<10?2:0)+' R☉'],['Masse',nf(b.ms,b.ms<1?3:2)+' M☉'],['Température de surface',nf(b.T,0)+' K']);
+      rows.push(['Rayon moyen',nf(b.R,b.R<100?1:0)+' km'],['Masse',sci(b.m)+' kg'],['Densité',rho<.01?sci(rho*1000)+' kg/m³':nf(rho,2)+' g/cm³'],['Gravité en surface',nf(g,g<.1?4:2)+' m/s²'],['Vitesse de libération',nf(ve,ve<1?3:2)+' km/s']);
+      if(b.cat==='sol'){if(b.W)rows.push(['Rotation sidérale',fDur(360/b.W[1])+(b.W[1]<0?' (rétrograde)':'')]);else rows.push(['Rotation','synchrone'])}
+      if(b.tilt!==undefined)rows.push(["Inclinaison de l'axe",nf(b.tilt,2)+'°']);
+      if(b.el){const q=planetEl(b,S.d);rows.push(['Période orbitale',fDur(Math.pow(q[0],1.5)*365.256)],['Demi-grand axe',nf(q[0],3)+' UA'],['Excentricité',nf(q[1],4)],["Inclinaison de l'orbite",nf(Math.abs(b.el[2]),2)+'°'])}
+      if(b.mo)rows.push(['Période orbitale',fDur(b.mo[1])+(b.mo[3]>90?' (rétrograde)':'')],['Demi-grand axe',b.exo?nf(b.mo[0]/149597870.7,4)+' UA':nf(b.mo[0],0)+' km']);
+      if(b.mo&&!b.exo)rows.push(['Excentricité',nf(b.mo[2],4)]);
+      if(b.temp)rows.push(['Température',b.temp]);
+      if(b.cat==='sol'&&b!==SUN)rows.push(['Distance au Soleil','<span id="lvS"></span>'],['Lumière du Soleil','<span id="lvL"></span>'],['Vitesse orbitale','<span id="lvV"></span>']);
+      if(b.cat==='sol'&&b!==EARTH)rows.push(['Distance à la Terre','<span id="lvE"></span>']);
+      if(b.exo)note="Orbite, taille et masse mesurées. L'aspect de la surface est imaginé : aucune image de cette planète n'existe.";
+      else if(b.mo&&b!==MOON)note="Période et taille d'orbite réelles ; la position le long de l'orbite est indicative."}
+    el.innerHTML=(b.d?'<p>'+b.d+'</p>':'')+'<dl>'+rows.map(r=>'<dt>'+r[0]+'</dt><dd>'+r[1]+'</dd>').join('')+'</dl>'+(note?'<p class="note">'+note+'</p>':'');
+    live.S=$('lvS');live.L=$('lvL');live.V=$('lvV');live.E=$('lvE');live.R=$('lvR');el.scrollTop=0}
+  const p=b.pos;
+  if(live.S||live.V){const r=Math.hypot(p[0],p[1],p[2])*1000;if(live.S)live.S.textContent=fDist(r);if(live.L)live.L.textContent=fLight(r);
+    const h=1e-3,p2=bodyPos(b,S.d+h,[0,0,0]);let v;
+    if(b.mo){const q1=b.par.pos,q2=bodyPos(b.par,S.d+h,[0,0,0]);v=Math.hypot(p2[0]-q2[0]-p[0]+q1[0],p2[1]-q2[1]-p[1]+q1[1],p2[2]-q2[2]-p[2]+q1[2])}else v=Math.hypot(p2[0]-p[0],p2[1]-p[1],p2[2]-p[2]);
+    if(live.V)live.V.textContent=nf(v*1000/(h*86400),2)+' km/s'}
+  if(live.E){const e=EARTH.pos,de=Math.hypot(p[0]-e[0],p[1]-e[1],p[2]-e[2])*1000;live.E.textContent=fDist(de);if(live.R)live.R.textContent=fLight(de)}}
+const dfD=new Intl.DateTimeFormat('fr-FR',{day:'numeric',month:'short',year:'numeric'}),dfT=new Intl.DateTimeFormat('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}),dfM=new Intl.DateTimeFormat('fr-FR',{hour:'2-digit',minute:'2-digit'});
+function renderClock(){const ms=(S.d+10957.5)*864e5,dt=new Date(ms),r=Math.abs(RATES[S.ri]);let t;
+  if(isNaN(dt)){t='—'}else t=dfD.format(dt)+(r>=604800?'':' · '+(r>=3600?dfM:dfT).format(dt));
+  $('date').textContent=t;const R=RATES[S.ri];$('rate').textContent=S.paused?'en pause':(R<0?'← ':'')+RLAB[Math.abs(R)];
+  $('play').textContent=S.paused?'▶':'❚❚';$('play').setAttribute('aria-label',S.paused?'Reprendre':'Pause');
+  const j=$('jump');if(document.activeElement!==j&&!isNaN(dt)){const v=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');if(j.value!==v&&dt.getFullYear()>999&&dt.getFullYear()<10000)j.value=v}}
+$('slow').onclick=()=>{S.ri=Math.max(0,S.ri-1);S.paused=false;renderClock()};
+$('fast').onclick=()=>{S.ri=Math.min(RATES.length-1,S.ri+1);S.paused=false;renderClock()};
+$('play').onclick=()=>{S.paused=!S.paused;renderClock()};
+$('now').onclick=()=>{S.d=nowD();S.ri=6;S.paused=false;renderClock()};
+$('jump').onchange=e=>{const v=e.target.value;if(!v)return;const t=new Date(v+'T12:00:00');if(!isNaN(t)){S.d=t.getTime()/864e5-10957.5;renderClock()}};
+$('sheet').hidden=!S.info;$('bInfo').setAttribute('aria-pressed',S.info);
+function tog(id,key,fn){const e=$(id);e.onclick=()=>{S[key]=!S[key];e.setAttribute('aria-pressed',S[key]);fn&&fn()}}
+tog('bInfo','info',()=>{$('sheet').hidden=!S.info||!!tour;if(S.info)renderSheet(true)});tog('bOrb','orbits');tog('bLab','labels');
+
+/* ---- recherche et visites guidées ---- */
+const TOURS=[
+{n:'Grand tour du système solaire',s:'Du Soleil à Pluton en 13 étapes',st:[
+ ['soleil',"Tout part d'ici. Le Soleil contient 99,86 % de la masse du système solaire et transforme chaque seconde 600 millions de tonnes d'hydrogène en hélium."],
+ ['mercure',"Mercure, la plus petite planète. Sans atmosphère pour garder la chaleur, elle passe de 427 °C le jour à −173 °C la nuit."],
+ ['venus',"Vénus a presque la taille de la Terre, mais il y fait 464 °C sous une atmosphère de CO₂ : c'est la planète la plus chaude."],
+ ['terre',"La Terre, telle qu'elle est en ce moment : la limite entre le jour et la nuit et les lumières des villes sont à l'heure réelle."],
+ ['lune',"La Lune nous montre toujours la même face, et s'éloigne de la Terre de 3,8 cm par an."],
+ ['mars',"Mars, deux fois plus petite que la Terre. Sa couleur vient de l'oxyde de fer : c'est une planète rouillée."],
+ ['jupiter',"Jupiter. Plus de 1 300 Terres tiendraient à l'intérieur. Sa Grande Tache rouge est une tempête suivie depuis près de deux siècles."],
+ ['io',"Io, malaxée en permanence par les marées de Jupiter, est l'astre le plus volcanique que l'on connaisse."],
+ ['saturne',"Saturne et ses anneaux : des milliards de blocs de glace sur 282 000 km de large, pour quelques dizaines de mètres d'épaisseur."],
+ ['titan',"Titan, la seule lune dotée d'une atmosphère épaisse. Il y pleut du méthane."],
+ ['uranus',"Uranus roule sur son orbite, l'axe couché à 98°."],
+ ['neptune',"Neptune, la dernière planète. La lumière du Soleil met plus de 4 heures à l'atteindre."],
+ ['pluton',"Pluton et Charon, aux portes de la ceinture de Kuiper. Vu d'ici, le Soleil n'est plus qu'une étoile très brillante."]]},
+{n:"Les échelles de l'Univers",s:'De la Terre à un quasar, en suivant la lumière',st:[
+ ['terre',"Point de départ : la Terre. La lumière en fait 7,5 fois le tour en une seconde."],
+ ['soleil',"Le Soleil est à 8 minutes-lumière. Pour la suite, la seule unité utile sera celle-ci : le temps que met la lumière."],
+ ['proxima',"Proxima du Centaure, l'étoile la plus proche : 4,2 années-lumière. La sonde Voyager 1 mettrait 75 000 ans à y arriver."],
+ ['trappist1',"TRAPPIST-1, à 40 années-lumière : sept planètes de la taille de la Terre autour d'une étoile à peine plus grosse que Jupiter."],
+ ['orion',"La nébuleuse d'Orion, à 1 344 années-lumière. La lumière que nous en recevons est partie à la fin du VIIe siècle."],
+ ['piliers',"Les Piliers de la Création, à 5 700 années-lumière. Nous les voyons tels qu'ils étaient au temps des premières cités de Mésopotamie."],
+ ['sgra',"Le centre de la Voie lactée, à 26 700 années-lumière : un trou noir de 4,3 millions de masses solaires."],
+ ['voielactee',"Notre galaxie vue de l'extérieur. Le Soleil est l'une de ses centaines de milliards d'étoiles."],
+ ['andromede',"Andromède, la grande galaxie voisine, à 2,5 millions d'années-lumière. Sa lumière est partie à l'époque des premiers outils de pierre taillée."],
+ ['m87gal',"M87, à 53 millions d'années-lumière. Le trait bleu est un jet de matière de 5 000 années-lumière, lancé par son trou noir central."],
+ ['q3c273',"Le quasar 3C 273. Sa lumière a voyagé 2,4 milliards d'années : à son départ, la vie sur Terre se résumait à des microbes."]]},
+{n:'Les étoiles par taille croissante',s:"De la Terre à Bételgeuse, avec un cercle de comparaison à chaque étape",st:[
+ ['terre',"Point de repère : la Terre, 12 742 km de diamètre. Tout ce qui suit est plus grand."],
+ ['jupiter',"Jupiter, la plus grosse planète : 11 fois le diamètre de la Terre. Le cercle montre la Terre à la même échelle.",['Terre',6371]],
+ ['trappist1',"TRAPPIST-1, l'une des plus petites étoiles connues : à peine 20 % plus large que Jupiter, mais 94 fois plus massive.",['Jupiter',69911]],
+ ['soleil',"Le Soleil : 1,39 million de km de diamètre, 10 fois Jupiter. C'est une étoile de taille moyenne.",['Jupiter',69911]],
+ ['sirius',"Sirius, l'étoile la plus brillante de notre ciel : 1,7 fois le diamètre du Soleil.",['Soleil',695700]],
+ ['arcturus',"Arcturus, une géante rouge : 25 fois le diamètre du Soleil. Le Soleil gonflera de cette façon à la fin de sa vie.",['Soleil',695700]],
+ ['aldebaran',"Aldébaran, l'œil du Taureau : 45 fois le Soleil.",['Arcturus',25.4*695700]],
+ ['rigel',"Rigel, une supergéante bleue : 79 fois le diamètre du Soleil, et environ 120 000 fois sa luminosité.",['Aldébaran',45.1*695700]],
+ ['deneb',"Deneb : 203 fois le Soleil. À sa place, elle engloberait Mercure, dont le cercle montre l'orbite.",['Orbite de Mercure',57909000]],
+ ['antares',"Antarès : 680 fois le Soleil. À sa place, elle engloberait Mercure, Vénus, la Terre et Mars. Le cercle montre l'orbite de la Terre.",['Orbite de la Terre',149597870]],
+ ['betelgeuse',"Bételgeuse : environ 760 fois le Soleil, soit un milliard de km de diamètre. La lumière met près d'une heure à la traverser. Le cercle montre l'orbite de Mars.",['Orbite de Mars',227940000]]]},
+{n:'Vie et mort des étoiles',s:"De la nébuleuse au trou noir, en 8 étapes",st:[
+ ['orion',"Les étoiles naissent dans des nuages de gaz et de poussière comme celui-ci. La nébuleuse d'Orion en fabrique des centaines en ce moment."],
+ ['piliers',"Dans les Piliers de la Création, le gaz s'effondre sous son propre poids. Au sommet des colonnes, de nouvelles étoiles s'allument."],
+ ['soleil',"Une étoile adulte : le Soleil. Il a 4,6 milliards d'années et brûlera son hydrogène pendant encore 5 milliards d'années environ."],
+ ['betelgeuse',"Bételgeuse, une étoile massive en fin de vie. Elle a tellement gonflé qu'elle engloberait l'orbite de Mars."],
+ ['anneau',"La fin d'une étoile comme le Soleil : elle souffle ses couches externes et laisse au centre une naine blanche qui refroidit."],
+ ['crabe',"La fin d'une étoile massive : une supernova. Celle-ci a été vue en plein jour en 1054. Ses débris s'étendent encore à 1 500 km/s."],
+ ['crabp',"Ce qu'il reste au centre : une étoile à neutrons. Plus de masse que le Soleil dans une sphère de 20 km, qui tourne 30 fois par seconde."],
+ ['cygx1',"Pour les étoiles les plus massives, rien n'arrête l'effondrement : il reste un trou noir. Cygnus X-1 pèse 21 fois le Soleil."]]}
+];
+const panel=$('panel'),capBar=$('capBar').firstElementChild;let pmode=null,tour=null;
+const norm=s=>s.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+function openPanel(m){
+  if(!m||pmode===m){panel.hidden=true;pmode=null;$('bFind').setAttribute('aria-pressed',false);$('bTour').setAttribute('aria-pressed',false);return}
+  pmode=m;panel.hidden=false;panel.textContent='';panel.style.top=($('tools').getBoundingClientRect().bottom+8)+'px';
+  $('bFind').setAttribute('aria-pressed',m==='find');$('bTour').setAttribute('aria-pressed',m==='tour');
+  if(m==='find'){const q=document.createElement('input');q.id='q';q.type='search';q.placeholder="Nom ou type d'astre";q.autocomplete='off';q.setAttribute('aria-label','Chercher un astre');
+    const list=document.createElement('div');panel.append(q,list);
+    const fill=()=>{const v=norm(q.value.trim());list.textContent='';
+      B.filter(b=>!v||norm(b.n).includes(v)||norm(b.t).includes(v)).forEach(b=>{const e=document.createElement('button');e.className='it';const s=document.createElement('span');s.textContent=b.t.split(' · ')[0];e.append(b.n,s);e.addEventListener('click',()=>{openPanel(null);if(tour)tourEnd();setFocus(b)});list.appendChild(e)});
+      if(!list.firstChild){const p=document.createElement('p');p.className='note';p.textContent='Aucun astre ne correspond.';list.appendChild(p)}};
+    q.addEventListener('input',fill);q.addEventListener('keydown',e=>{if(e.key==='Enter'){const f=list.querySelector('button');if(f)f.click()}else if(e.key==='Escape')openPanel(null)});
+    fill();if(S.W>=720)q.focus()}
+  else TOURS.forEach(T=>{const e=document.createElement('button');e.className='it col';const s=document.createElement('span');s.textContent=T.s;e.append(T.n,s);e.addEventListener('click',()=>{openPanel(null);tourStart(T)});panel.appendChild(e)})}
+$('bFind').onclick=()=>openPanel('find');$('bTour').onclick=()=>openPanel('tour');
+function tourShow(){const st=tour.T.st[tour.i],b=byId[st[0]];$('capN').textContent=tour.T.n+' · '+(tour.i+1)+' / '+tour.T.st.length;$('capT').textContent=st[1];
+  tour.ref=st[2]||null;$('ref').hidden=!tour.ref;if(tour.ref)$('ref').firstElementChild.textContent=tour.ref[0];
+  tour.el=0;tour.dur=8+st[1].length*.055;if(b!==S.focus)setFocus(b);else S.distT=arrive(b)}
+function tourStart(T){tour={T,i:0,el:0,dur:10,hold:false};$('cap').hidden=false;$('hint').hidden=true;$('tabs').hidden=$('rail').hidden=$('sheet').hidden=true;$('tHold').textContent='❚❚';tourShow()}
+function tourEnd(){tour=null;$('ref').hidden=true;$('cap').hidden=true;$('tabs').hidden=$('rail').hidden=false;$('sheet').hidden=!S.info;renderRail();if(S.info)renderSheet(true)}
+function tourStep(k){const i=tour.i+k;if(i>=tour.T.st.length){tourEnd();return}tour.i=Math.max(0,i);tourShow()}
+$('tPrev').onclick=()=>tourStep(-1);$('tNext').onclick=()=>tourStep(1);$('tQuit').onclick=tourEnd;
+$('tHold').onclick=()=>{tour.hold=!tour.hold;$('tHold').textContent=tour.hold?'▶':'❚❚';$('tHold').setAttribute('aria-label',tour.hold?'Reprendre la visite':'Mettre la visite en pause')};
+window.addEventListener('hashchange',()=>{const b=byId[location.hash.slice(1)];if(b&&b!==S.focus)setFocus(b)});
+setTimeout(()=>{$('hint').hidden=true},15000);
+
+/* ---- gestes : glisser = tourner, molette / pincement = zoom, toucher un astre = s'y rendre ---- */
+const ptrs=new Map();let moved=0,pinch=0,downT=0;
+canvas.addEventListener('pointerdown',e=>{$('hint').hidden=true;if(pmode)openPanel(null);canvas.setPointerCapture(e.pointerId);ptrs.set(e.pointerId,[e.clientX,e.clientY]);if(ptrs.size===1){moved=0;downT=performance.now()}pinch=0;S.vy=S.vp=0});
+canvas.addEventListener('pointermove',e=>{const p=ptrs.get(e.pointerId);if(!p)return;const dx=e.clientX-p[0],dy=e.clientY-p[1];p[0]=e.clientX;p[1]=e.clientY;
+  if(ptrs.size===1){moved+=Math.abs(dx)+Math.abs(dy);const f=S.focus,k=.0055*(f.flat?1:Math.min(1,Math.max(.05,(S.dist-f.Rm)/f.Rm)));S.vy=-dx*k;S.vp=dy*k;S.yaw+=S.vy;S.pitch=Math.max(-1.5,Math.min(1.5,S.pitch+S.vp))}
+  else if(ptrs.size===2){const a=[...ptrs.values()],d=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]);if(pinch)zoom(pinch/d);pinch=d;moved=99}});
+function up(e){if(!ptrs.has(e.pointerId))return;ptrs.delete(e.pointerId);pinch=0;if(ptrs.size===0&&moved<8&&performance.now()-downT<450)pick(e.clientX,e.clientY)}
+canvas.addEventListener('pointerup',up);canvas.addEventListener('pointercancel',e=>{ptrs.delete(e.pointerId);pinch=0});
+canvas.addEventListener('wheel',e=>{$('hint').hidden=true;e.preventDefault();zoom(Math.exp((e.deltaMode?e.deltaY*30:e.deltaY)*.0014))},{passive:false});
+canvas.addEventListener('keydown',e=>{const k=e.key;if(k==='+'||k==='=')zoom(.8);else if(k==='-')zoom(1.25);else if(k==='ArrowLeft')S.yaw-=.08;else if(k==='ArrowRight')S.yaw+=.08;else if(k==='ArrowUp')S.pitch=Math.min(1.5,S.pitch+.06);else if(k==='ArrowDown')S.pitch=Math.max(-1.5,S.pitch-.06);else if(k===' ')$('play').click();else return;e.preventDefault()});
+const MAXD=6e9*LY;
+function zoom(f){S.distT=Math.min(MAXD,Math.max(minDist(S.focus),S.distT*f))}
+function pick(x,y){let best=null,bd=1e9;B.forEach(b=>{if(!b.onScreen||!b.shown)return;const pk=b.flat?Math.min(b.px,30):b.px,d=Math.hypot(b.sx-x,b.sy-y),lim=Math.max(pk,26);if(d<lim&&d-pk<bd){bd=d-pk;best=b}});if(best)setFocus(best)}
+
+function resize(){const w=window.innerWidth,h=window.innerHeight;S.W=w;S.H=h;renderer.setSize(w,h,false);composer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix()}
+window.addEventListener('resize',resize);resize();
+
+/* ============ boucle ============ */
+const qT=new THREE.Quaternion(),vT=new THREE.Vector3(),vS=new THREE.Vector3(),m4=new THREE.Matrix4(),fwd=new THREE.Vector3();
+const ease=t=>t*t*t*(t*(6*t-15)+10),sat=x=>x<0?0:x>1?1:x,FARC=2e9;
+const texLoader=new THREE.TextureLoader(),PIL=byId.piliers,AIG=byId.aigle;
+let last=performance.now(),acc=0;
+function frame(now){
+  const dt=Math.min(.1,(now-last)/1000);last=now;clockU.value+=dt;
+  if(!S.paused)S.d+=RATES[S.ri]*dt/86400;
+  const d=S.d;
+  B.forEach(b=>bodyPos(b,d,b.pos));
+  if(tour){if(!ptrs.size&&!reduce)S.yaw+=dt*.04;if(!tour.hold&&S.tr>=1){tour.el+=dt;if(tour.el>=tour.dur)tourStep(1)}if(tour)capBar.style.transform='scaleX('+Math.min(1,tour.el/tour.dur).toFixed(3)+')'}
+  // --- caméra
+  if(!ptrs.size){S.yaw+=S.vy;S.pitch=Math.max(-1.5,Math.min(1.5,S.pitch+S.vp));S.vy*=.92;S.vp*=.92}
+  const f=S.focus;let extra=0;
+  if(S.tr<1){S.tr=Math.min(1,S.tr+dt/S.trDur);const s=ease(S.tr),p0=S.prev.pos,p1=f.pos;for(let k=0;k<3;k++)fp[k]=p0[k]+(p1[k]-p0[k])*s;
+    S.dist=Math.exp(Math.log(S.d0)+(Math.log(S.distT)-Math.log(S.d0))*s);extra=S.sep*.85*Math.pow(Math.sin(Math.PI*s),2)}
+  else{fp[0]=f.pos[0];fp[1]=f.pos[1];fp[2]=f.pos[2];S.dist=Math.exp(Math.log(S.dist)+(Math.log(S.distT)-Math.log(S.dist))*Math.min(1,dt*7))}
+  const D=S.dist+extra,cp=Math.cos(S.pitch);
+  vT.set(cp*Math.sin(S.yaw),Math.sin(S.pitch),cp*Math.cos(S.yaw));
+  camPos[0]=fp[0]+vT.x*D;camPos[1]=fp[1]+vT.y*D;camPos[2]=fp[2]+vT.z*D;
+  camera.position.set(0,0,0);camera.up.set(0,1,0);camera.lookAt(-vT.x,-vT.y,-vT.z);
+  camera.near=Math.min(1e5,Math.max(1e-7,f.flat?D*.01:(D-f.Rm)*.02));camera.far=1e17;camera.updateProjectionMatrix();camera.updateMatrixWorld(true);
+  fwd.set(-vT.x,-vT.y,-vT.z);
+  const pxK=S.H/2/Math.tan(camera.fov*D2R/2);
+  // --- changement d'échelle : le ciel fixe laisse place à la galaxie en volume entre 3 000 et 20 000 al du Soleil
+  const camSun=Math.hypot(camPos[0],camPos[1],camPos[2]),gf=sat((Math.log10(camSun+1)-13.45)/.83),sky=1-gf;
+  starMat.uniforms.uFade.value=sky;milky.material.uniforms.uFade.value=sky;milky.visible=sky>.003;if(stars)stars.visible=sky>.003;
+  // --- astres
+  B.forEach((b,i)=>{b.rel.set(b.pos[0]-camPos[0],b.pos[1]-camPos[1],b.pos[2]-camPos[2]);b.dist=b.rel.length();b.px=b.Rm/b.dist*pxK;
+    const z=b.rel.dot(fwd);b.onScreen=z>0;
+    if(b.onScreen){vS.copy(b.rel).project(camera);b.sx=(vS.x*.5+.5)*S.W;b.sy=(-vS.y*.5+.5)*S.H;b.onScreen=b.sx>-60&&b.sx<S.W+60&&b.sy>-60&&b.sy<S.H+60}
+    const an=b.par||b.anc||(b!==SUN&&b.inMW?SUN:null);
+    b.sepPx=an?(b.onScreen&&an.onScreen?Math.hypot(b.sx-an.sx,b.sy-an.sy):999):999;
+    const kc=b.dist>FARC?FARC/b.dist:1;mkPos[i*3]=b.rel.x*kc;mkPos[i*3+1]=b.rel.y*kc;mkPos[i*3+2]=b.rel.z*kc;let ma=0;
+    if(b.kind==='bh'){const big=b.px*b.disc[1];ma=.75*(1-sat((big-1.5)/3));const vis=big>1.2;b.mesh.visible=vis;
+      if(vis){const q=(b.disc[1]+10)*b.Rm*kc;b.mesh.position.copy(b.rel).multiplyScalar(kc);b.mesh.quaternion.copy(camera.quaternion);b.mesh.scale.set(q,q,1);
+        b.mat.uniforms.uRo.value.set(-(b.pos[0]-camPos[0])/b.Rm,-(b.pos[1]-camPos[1])/b.Rm,-(b.pos[2]-camPos[2])/b.Rm)}
+    }else if(b.flat){
+      if(b.img){let a=(sat(b.px/40)*.75+.25)*sat(b.dist/(b.Rm*.03)-.3);if(b===PIL)a=sat((b.px-30)/80);if(b===AIG)a*=1-sat((PIL.px-40)/70);
+        if(!b.tex&&!b.loading&&(b.px>3||b===f)){b.loading=1;texLoader.load('img-'+b.img+'.jpg',t=>{t.anisotropy=maxA;b.tex=t;b.mat.uniforms.tImg.value=t})}
+        const vis=!!b.tex&&a>.004&&b.px>.4;b.mesh.visible=vis;
+        if(vis){const k=b.dist>FARC?FARC/b.dist:1;b.mesh.position.copy(b.rel).multiplyScalar(k);b.mesh.quaternion.copy(camera.quaternion);b.mesh.scale.set(b.Rm*k,b.Rm*k/b.asp,1);b.mat.uniforms.uA.value=a}
+        if(b.cat==='neb')ma=.5*(1-sat((b.px-1)/3))*sky}
+    }else{
+      const vis=b.px>.35;b.mesh.visible=vis;
+      if(b.kind==='sun'){ // de loin, l'étoile devient un point lumineux ; de près, une sphère et sa couronne
+        const far=sat(Math.log10(b.dist/(b.Rm*(b.ns?4e5:2500))));ma=b.cat==='ext'?far*.7:far*(.35+.65*sky)*(b===SUN?.8:(1-sat((Math.log10(b.dist/LY+1)-2.6)/1.1))*sat((b.sepPx-3)/8+(b===f?1:0)));b.ma=ma;
+        const cs=Math.max(b.Rm*30,b.dist*.085*(1-far));b.cor.visible=far<.999;
+        if(b.cor.visible){b.cor.position.copy(b.rel);b.cor.quaternion.copy(camera.quaternion);b.cor.scale.set(cs,cs,1);b.cor.material.uniforms.uK.value=cs/2/b.Rm}
+      }else{ma=1-sat((b.px-1.2)/2.5);ma*=sat((b.sepPx-5)/10);if(b.mo)ma*=.7}
+      if(vis){b.mesh.position.copy(b.rel);bodyQuat(b,d,b.mesh.quaternion);b.mat.uniforms.uRot.value.setFromMatrix4(m4.makeRotationFromQuaternion(b.mesh.quaternion));
+        if(b.kind!=='sun'){const u=b.mat.uniforms,st=b.star.pos,dx=st[0]-b.pos[0],dy=st[1]-b.pos[1],dz=st[2]-b.pos[2];
+          u.uSun.value.set(dx,dy,dz).normalize();u.uSunAng.value=b.star.Rm/Math.hypot(dx,dy,dz);u.uPx.value=b.px;
+          const oc=u.uOcc.value;let n=0;
+          if(b.mo&&!b.exo){oc[n++].set(b.par.pos[0]-b.pos[0],b.par.pos[1]-b.pos[1],b.par.pos[2]-b.pos[2],b.par.Rm*(b.par.obl||1))}
+          else if(!b.mo)for(let k=0;k<b.kids.length&&n<4;k++){const m=b.kids[k];if(m.R>150)oc[n++].set(m.pos[0]-b.pos[0],m.pos[1]-b.pos[1],m.pos[2]-b.pos[2],m.Rm)}
+          for(;n<4;n++)oc[n].w=0;
+          if(b.ring===2)u.uRing.value.z=Math.min(2,b.dist/pxK*1.2)}}
+      if(b.amesh){b.amesh.visible=b.px>3;b.amesh.position.copy(b.rel)}
+      if(b.rmesh){b.rmesh.visible=b.px>.6;b.rmesh.position.copy(b.rel)}
+    }
+    mkCol[i*4]=b.lc.r;mkCol[i*4+1]=b.lc.g;mkCol[i*4+2]=b.lc.b;mkCol[i*4+3]=ma;
+  });
+  mkG.attributes.position.needsUpdate=true;mkG.attributes.aCol.needsUpdate=true;
+  // --- jets relativistes et faisceaux des pulsars
+  B.forEach(b=>{if(!b.jets)return;const L=b.jet.len,vis=L/b.dist*pxK>2;let ax=b.axis;
+    if(vis&&b.ns){const a=clockU.value*TAU/b.ns.Pv;qT.setFromAxisAngle(YAX,a);ax=vT.set(.62,.78,0).applyQuaternion(qT).normalize();qT.setFromUnitVectors(YAX,b.axis);ax.applyQuaternion(qT)}
+    const kc=b.dist>FARC?FARC/b.dist:1;
+    const ji=b.jet.I*sat((b.dist/(L*b.jet.w)-.2)/.8);
+    b.jets.forEach(m=>{m.visible=vis&&ji>.01;if(!m.visible)return;m.material.uniforms.uI.value=ji;m.position.copy(b.rel).multiplyScalar(kc);vS.copy(ax).multiplyScalar(m.userData.sg);m.quaternion.setFromUnitVectors(YAX,vS);m.scale.set(L*b.jet.w*kc,L*kc,L*b.jet.w*kc)})});
+  // --- Voie lactée en volume
+  galaxy.visible=gf>.003;
+  if(galaxy.visible){const k=MW.dist>FARC?FARC/MW.dist:1;galaxy.position.copy(MW.rel).multiplyScalar(k);galaxy.scale.setScalar(k);galU.uK.value=k;galU.uFade.value=gf;galU.uDim.value=sat(Math.pow(MW.px/380,2))}
+  beltMat.uniforms.uD.value=d;beltMat.uniforms.uFade.value=Math.min(1,Math.max(.25,D/3e4))*(1-sat(Math.log10(SUN.dist+1)-8.3));belt.visible=beltMat.uniforms.uFade.value>.004;
+  // --- orbites
+  B.forEach(b=>{if(!b.ol)return;const sysOk=!b.mo||b.sys===f.sys||b.par.px>.5;
+    if(!(S.orbits&&sysOk)){b.ol.visible=false;return}
+    const ref=b.mo?b.mo[0]/1000:b.el[0]*AU,rpx=ref/b.par.dist*pxK;let o=sat((b.dist/b.Rm-25)/200);
+    if(b.mo)o*=sat((rpx-10)/30)*(b.exo?.4:.26);else o*=.38*sat((rpx-5)/20);
+    o*=sat((D/ref-.006)/.06);
+    if(b===f&&S.tr>=1)o*=sat((D/b.Rm-60)/400);
+    b.ol.visible=o>.01;if(!b.ol.visible)return;b.ol.material.opacity=o;
+    b.ol.position.copy(b.par.rel);buildOrbit(b,d)});
+  // --- noms
+  B.forEach(b=>{const e=b.lb;let show=b.onScreen&&!(b===f&&b.px*(b.kind==='bh'?8:1)>18&&S.tr>=1);
+    if(show&&b.mo)show=b.sys===f.sys&&b.sepPx>34&&b.par.px>.8;
+    else if(show&&b!==SUN&&b!==f&&b!==MW)show=b.sepPx>28&&(b.cat!=='gal'||b.px>2)&&(b.cat!=='ext'||b.inMW||b.px*20>1||gf>.9);
+    if(show&&b===MW)show=gf>.5&&b.px<S.H*.2;
+    if(show&&b.inMW&&b!==f&&b!==MW&&MW.px<140&&gf>.5)show=false;
+    if(show&&b.kind==='sun'&&b!==f&&(b===SUN?gf>.5&&MW.px<60:b.ma<.06))show=false;
+    if(show&&(b.cat==='sol'||b.cat==='craft')&&!b.mo&&b!==SUN&&gf>.01)show=false;
+    if(show&&b!==f&&!f.flat&&b.dist>f.dist&&Math.hypot(b.sx-f.sx,b.sy-f.sy)<f.px)show=false;
+    if(show&&b!==f&&f.onScreen&&Math.hypot(b.sx-f.sx,b.sy-f.sy)<24)show=false;
+    b.shown=show||b.px>3;show=show&&S.labels;
+    if(show){e.hidden=false;const o=b.flat?10:Math.min(b.px,400)*.72+4;e.style.transform='translate('+(b.sx+o).toFixed(1)+'px,'+(b.sy-10-o).toFixed(1)+'px)'}else if(!e.hidden)e.hidden=true});
+  if(tour&&tour.ref){const e=$('ref'),ok=S.tr>=1&&f.onScreen;e.style.opacity=ok?1:0;
+    if(ok){const r=Math.max(2,tour.ref[1]/1000/f.dist*pxK);e.style.width=e.style.height=(2*r).toFixed(1)+'px';e.style.transform='translate('+(f.sx-r).toFixed(1)+'px,'+(f.sy-r).toFixed(1)+'px)'}}
+  composer.render();
+  // --- lectures (4 fois par seconde)
+  acc+=dt;if(acc>.25){acc=0;$('range').textContent='à '+fDist((f.flat?f.dist:f.dist-f.Rm)*1000);renderClock();if(S.info)renderSheet(false)}
+  requestAnimationFrame(frame)}
+
+/* ============ démarrage ============ */
+B.forEach(b=>bodyPos(b,S.d,b.pos));
+(function(){const e=EARTH.pos;S.yaw=Math.atan2(-e[0],-e[2])+1.05;S.pitch=.24})(); // Soleil à ~60° de l'axe de visée : terminateur visible
+setFocus(byId[location.hash.slice(1)]||EARTH,true);renderClock();
+const maxA=renderer.capabilities.getMaxAnisotropy();
+const loader=texLoader;let pending=4;const done=()=>{if(--pending<=0)$('load').classList.add('off')};
+function load(file,key,uni){loader.load(file,t=>{t.anisotropy=maxA;t.wrapS=THREE.RepeatWrapping;eU[uni].value=t;done()},undefined,done)}
+load('earth-day.jpg','day','tDay');load('earth-night.jpg','night','tNight');load('earth-water.png','water','tWater');load('earth-clouds.jpg','cloud','tCloud');
+setTimeout(()=>$('load').classList.add('off'),9000);
+fetch('stars.json').then(r=>r.json()).then(buildStars).catch(()=>{});
+window.__cosmos={S,B,byId,bodyPos,setFocus,renderer,bloom,tone,LY,tourStart,TOURS,openPanel};
+requestAnimationFrame(frame);
+})();
+</script>
+<script>
+if('serviceWorker' in navigator&&location.protocol==='https:')window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){})});
+</script>
+</body>
+</html>
